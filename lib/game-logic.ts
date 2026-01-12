@@ -1,0 +1,201 @@
+import { getModel, generateQuestImage } from './gemini';
+import { geocodeLocation, calculateDistance } from './location';
+import { getQuestLocations } from './places';
+import { Campaign, Quest, DistanceRange, DISTANCE_RANGES, PlaceData, Coordinates } from '../types';
+
+export async function generateCampaign(
+  location: string,
+  type: 'short' | 'long',
+  distanceRange: DistanceRange
+): Promise<Campaign> {
+  const questCount = type === 'short' ? 3 : 5;
+
+  // STEP 1: Geocode the starting location
+  console.log('[GeoSeeker] Geocoding location:', location);
+  const locationData = await geocodeLocation(location);
+  console.log('[GeoSeeker] Coordinates:', locationData.coordinates);
+
+  // STEP 2: Get quest locations using Places API (with fallback to random coordinates)
+  const questLocations = await getQuestLocations(
+    locationData.coordinates,
+    distanceRange,
+    questCount
+  );
+  console.log('[GeoSeeker] Retrieved quest locations for', distanceRange, 'range');
+
+  // Extract coordinates from quest locations (whether PlaceData or Coordinates)
+  const questCoords: Coordinates[] = questLocations.map((loc) =>
+    'placeId' in loc ? loc.coordinates : loc
+  );
+
+  // STEP 3: Calculate walking distances between consecutive points
+  const startPoint = locationData.coordinates;
+  const allPoints = [startPoint, ...questCoords];
+  const distances: number[] = [];
+  const durations: number[] = [];
+
+  for (let i = 0; i < questCoords.length; i++) {
+    const distanceData = await calculateDistance(allPoints[i], allPoints[i + 1]);
+    distances.push(distanceData.distanceKm);
+    durations.push(distanceData.durationMinutes);
+  }
+
+  const totalDistance = distances.reduce((sum, d) => sum + d, 0);
+  const totalTime = durations.reduce((sum, d) => sum + d, 0);
+
+  console.log(
+    `[GeoSeeker] Total campaign: ${totalDistance.toFixed(1)}km, ~${totalTime} minutes walking`
+  );
+
+  // STEP 4: Generate campaign with Gemini AI using real places
+  const model = getModel('campaign');
+  const rangeConfig = DISTANCE_RANGES[distanceRange];
+
+  // Build quest location information for AI prompt
+  const questLocationInfo = questLocations.map((loc, i) => {
+    const isPlace = 'placeId' in loc;
+    if (isPlace) {
+      const place = loc as PlaceData;
+      return `Quest ${i + 1}: ${place.name}
+        - Address: ${place.formattedAddress}
+        - Coordinates: ${place.coordinates.lat.toFixed(4)}, ${place.coordinates.lng.toFixed(4)}
+        - Types: ${place.types.join(', ')}
+        - Distance from previous: ${distances[i].toFixed(1)}km, ~${durations[i]} min walking`;
+    } else {
+      const coords = loc as Coordinates;
+      return `Quest ${i + 1}: Random location
+        - Coordinates: ${coords.lat.toFixed(4)}, ${coords.lng.toFixed(4)}
+        - Distance from previous: ${distances[i].toFixed(1)}km, ~${durations[i]} min walking`;
+    }
+  }).join('\n\n');
+
+  const prompt = `
+    You are an expert travel guide and game designer.
+    Create a ${type} walking scavenger hunt campaign for a player in ${locationData.formattedAddress}.
+
+    DISTANCE RANGE: ${rangeConfig.label}
+    - Quest spacing: ${rangeConfig.minDistance}-${rangeConfig.maxDistance}km
+    - Total quests: ${questCount}
+    - Player will be exploring on foot
+
+    QUEST LOCATIONS (Real places from Google Places API):
+    ${questLocationInfo}
+
+    For each quest location:
+    - If a real place name is provided, create a quest specifically for that location
+    - Make the objective relevant to the place type (museum, park, temple, etc.)
+    - Create culturally relevant objectives that make sense for ${locationData.formattedAddress}
+    - Make sure the photo objective is something actually visible and photographable at that location
+    - Provide specific hints that help players find the exact spot
+    - Ensure quests are appropriate for walking exploration
+
+    The output MUST be a JSON object matching this structure:
+    {
+      "id": "unique-id",
+      "location": "${location}",
+      "type": "${type}",
+      "quests": [
+        {
+          "id": "q1",
+          "title": "string (exciting quest name referencing the place)",
+          "narrative": "A flavor-text description of why the player is doing this quest",
+          "objective": "A clear, 1-sentence instruction of what to photograph at this specific location",
+          "secretCriteria": ["List of visual elements the photo MUST contain"],
+          "locationHint": "Specific hint about the location (use the place name if available)",
+          "difficulty": "easy | medium | hard"
+        }
+      ]
+    }
+
+    Make the quests feel like an exciting walking adventure through real places!
+  `;
+
+  const result = await model.generateContent(prompt);
+  const response = await result.response;
+  const text = response.text();
+
+  try {
+    const campaignData = JSON.parse(text);
+
+    // STEP 5: Enrich quest data with coordinates, distance, and place metadata
+    const questsWithMetadata = campaignData.quests.map((quest: Quest, i: number) => {
+      const location = questLocations[i];
+      const isPlace = 'placeId' in location;
+
+      return {
+        ...quest,
+        coordinates: questCoords[i],
+        distanceFromPrevious: distances[i],
+        estimatedDuration: durations[i],
+        placeName: isPlace ? (location as PlaceData).name : undefined,
+        placeTypes: isPlace ? (location as PlaceData).types : undefined,
+      };
+    });
+
+    // STEP 6: Generate images for all quests in parallel
+    console.log('[GeoSeeker] Generating quest images...');
+    const questsWithImages = await Promise.all(
+      questsWithMetadata.map(async (quest: Quest) => {
+        const imageUrl = await generateQuestImage(quest);
+        return {
+          ...quest,
+          imageUrl,
+          imageGenerationFailed: !imageUrl,
+        };
+      })
+    );
+
+    return {
+      ...campaignData,
+      quests: questsWithImages,
+      currentQuestIndex: 0,
+      distanceRange: distanceRange,
+      startCoordinates: locationData.coordinates,
+      totalDistance: totalDistance,
+      estimatedTotalTime: totalTime,
+    };
+  } catch (error) {
+    console.error('[GeoSeeker] Failed to parse campaign JSON:', text);
+    throw new Error('Failed to generate valid campaign JSON');
+  }
+}
+
+export async function verifyPhoto(
+  base64Image: string,
+  objective: string,
+  secretCriteria: string[]
+): Promise<{ success: boolean; feedback: string }> {
+  const model = getModel('verification'); // Gemini 3 Flash is great for vision speed
+
+  const prompt = `
+    Analyze this image against the objective: "${objective}".
+    Specifically look for these criteria: ${secretCriteria.join(', ')}.
+
+    Respond in JSON format:
+    {
+      "success": boolean,
+      "feedback": "A witty, personality-driven comment on the photo. If it failed, give a hint."
+    }
+  `;
+
+  // Note: base64Image should be the data part only, e.g. "data:image/jpeg;base64,..."
+  const imagePart = {
+    inlineData: {
+      data: base64Image.split(',')[1],
+      mimeType: 'image/jpeg',
+    },
+  };
+
+  const result = await model.generateContent([prompt, imagePart]);
+  const response = await result.response;
+  const text = response.text();
+
+  // Since the model is configured with responseMimeType: "application/json",
+  // the response is already pure JSON, no need for regex extraction
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.error('[GeoSeeker] Failed to parse photo verification JSON:', text);
+    throw new Error('Failed to verify photo - invalid JSON response');
+  }
+}
