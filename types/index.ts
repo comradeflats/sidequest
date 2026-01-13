@@ -109,8 +109,65 @@ export interface Campaign {
   estimatedTotalTime?: number;    // Total time estimate in minutes (walking)
 }
 
+// Media types for verification
+export type MediaType = 'photo' | 'video' | 'audio';
+
+// Media capture data
+export interface MediaCaptureData {
+  type: MediaType;
+  data: string; // base64 data URL
+  duration?: number; // seconds (for video/audio)
+}
+
 export interface VerificationResult {
   success: boolean;
   feedback: string;
   reasoning?: string;
+  appealable?: boolean;          // Can this be appealed?
+  distanceFromTarget?: number;   // GPS distance in meters
+  mediaType?: MediaType;         // Type of media that was verified
+}
+
+export interface AppealData {
+  userExplanation: string;
+  userGpsCoordinates: Coordinates | null;
+  distanceFromTarget: number | null; // meters
+  timestamp: Date;
+}
+
+export interface AppealResult {
+  success: boolean;
+  feedback: string;
+  reasoning: string;
+  acceptedContext: boolean;      // Did AI accept user's explanation?
+  gpsWasHelpful: boolean;        // Did GPS proximity influence decision?
+}
+
+export interface JourneyPoint {
+  coordinates: Coordinates;
+  timestamp: Date;
+  accuracy: number; // meters
+  questIndex: number; // Which quest was active
+}
+
+export interface JourneyStats {
+  totalDistanceTraveled: number; // km (actual GPS path)
+  startTime: Date;
+  endTime?: Date;
+  durationMinutes: number;
+  pathPoints: JourneyPoint[];
+  questCompletionTimes: Date[]; // When each quest completed
+}
+
+// Stored campaign data for persistence
+export interface StoredCampaign {
+  campaign: Campaign;
+  completedAt: Date | null;
+  lastPlayedAt: Date;
+  progress: {
+    currentQuestIndex: number;
+    completedQuests: string[]; // quest IDs
+    verificationResults: Record<string, VerificationResult>;
+  };
+  journeyStats?: JourneyStats;
 }

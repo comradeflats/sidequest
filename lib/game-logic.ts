@@ -1,7 +1,7 @@
 import { getModel, generateQuestImage } from './gemini';
 import { geocodeLocation, calculateDistance } from './location';
 import { getQuestLocations } from './places';
-import { Campaign, Quest, DistanceRange, DISTANCE_RANGES, PlaceData, Coordinates } from '../types';
+import { Campaign, Quest, DistanceRange, DISTANCE_RANGES, PlaceData, Coordinates, AppealData, AppealResult, VerificationResult } from '../types';
 
 export async function generateCampaign(
   location: string,
@@ -160,12 +160,68 @@ export async function generateCampaign(
   }
 }
 
+// Helper function to calculate straight-line distance between two coordinates
+function calculateStraightLineDistance(
+  origin: Coordinates,
+  destination: Coordinates
+): { distanceMeters: number } {
+  const R = 6371; // Earth's radius in km
+  const dLat = ((destination.lat - origin.lat) * Math.PI) / 180;
+  const dLng = ((destination.lng - origin.lng) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((origin.lat * Math.PI) / 180) *
+      Math.cos((destination.lat * Math.PI) / 180) *
+      Math.sin(dLng / 2) *
+      Math.sin(dLng / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  const distanceKm = R * c;
+  return { distanceMeters: distanceKm * 1000 };
+}
+
+// Helper function to calculate GPS confidence factor
+function calculateGpsConfidence(distanceMeters: number | null): number {
+  if (!distanceMeters) return 0;
+
+  // Confidence scoring:
+  // 0-15m: 1.0 (perfect)
+  // 15-30m: 0.8-1.0 (very high)
+  // 30-50m: 0.5-0.8 (medium)
+  // 50-100m: 0.2-0.5 (low)
+  // >100m: 0-0.2 (very low)
+
+  if (distanceMeters <= 15) return 1.0;
+  if (distanceMeters <= 30) return 0.8 + (0.2 * (30 - distanceMeters) / 15);
+  if (distanceMeters <= 50) return 0.5 + (0.3 * (50 - distanceMeters) / 20);
+  if (distanceMeters <= 100) return 0.2 + (0.3 * (100 - distanceMeters) / 50);
+
+  return Math.max(0, 0.2 * (1 - (distanceMeters - 100) / 200));
+}
+
+// Helper function to get GPS confidence label
+function getGpsConfidenceLabel(confidence: number): string {
+  if (confidence >= 0.9) return '🎯 (Excellent)';
+  if (confidence >= 0.7) return '✓ (Good)';
+  if (confidence >= 0.5) return '~ (Fair)';
+  if (confidence >= 0.3) return '? (Uncertain)';
+  return '✗ (Unreliable)';
+}
+
 export async function verifyPhoto(
   base64Image: string,
   objective: string,
-  secretCriteria: string[]
-): Promise<{ success: boolean; feedback: string }> {
+  secretCriteria: string[],
+  userGps?: Coordinates,
+  targetGps?: Coordinates
+): Promise<VerificationResult> {
   const model = getModel('verification'); // Gemini 3 Flash is great for vision speed
+
+  // Calculate distance if GPS available
+  let distanceFromTarget: number | undefined;
+  if (userGps && targetGps) {
+    const distanceData = calculateStraightLineDistance(userGps, targetGps);
+    distanceFromTarget = distanceData.distanceMeters;
+  }
 
   const prompt = `
     Analyze this image against the objective: "${objective}".
@@ -174,7 +230,8 @@ export async function verifyPhoto(
     Respond in JSON format:
     {
       "success": boolean,
-      "feedback": "A witty, personality-driven comment on the photo. If it failed, give a hint."
+      "feedback": "A witty, personality-driven comment on the photo. If it failed, give a hint.",
+      "appealable": boolean (true if close but not quite right, false if completely wrong)
     }
   `;
 
@@ -193,9 +250,194 @@ export async function verifyPhoto(
   // Since the model is configured with responseMimeType: "application/json",
   // the response is already pure JSON, no need for regex extraction
   try {
-    return JSON.parse(text);
+    const parsed = JSON.parse(text);
+    return {
+      ...parsed,
+      distanceFromTarget,
+      mediaType: 'photo'
+    };
   } catch (error) {
     console.error('[GeoSeeker] Failed to parse photo verification JSON:', text);
     throw new Error('Failed to verify photo - invalid JSON response');
+  }
+}
+
+export async function verifyVideo(
+  base64Video: string,
+  objective: string,
+  secretCriteria: string[],
+  userGps?: Coordinates,
+  targetGps?: Coordinates
+): Promise<VerificationResult> {
+  const model = getModel('verification');
+
+  // Calculate distance if GPS available
+  let distanceFromTarget: number | undefined;
+  if (userGps && targetGps) {
+    const distanceData = calculateStraightLineDistance(userGps, targetGps);
+    distanceFromTarget = distanceData.distanceMeters;
+  }
+
+  const prompt = `
+    Analyze this video clip against the objective: "${objective}".
+    Specifically look for these criteria: ${secretCriteria.join(', ')}.
+
+    The video is 10 seconds or less. Analyze the full video content for the required elements.
+    Look for visual landmarks, movements, and any identifying features that match the quest objective.
+
+    Respond in JSON format:
+    {
+      "success": boolean,
+      "feedback": "A witty, personality-driven comment on the video. If it failed, give a hint.",
+      "appealable": boolean (true if close but not quite right, false if completely wrong)
+    }
+  `;
+
+  // Convert base64 video to format Gemini accepts
+  const videoPart = {
+    inlineData: {
+      data: base64Video.split(',')[1],
+      mimeType: 'video/webm',
+    },
+  };
+
+  const result = await model.generateContent([prompt, videoPart]);
+  const response = await result.response;
+  const text = response.text();
+
+  try {
+    const parsed = JSON.parse(text);
+    return {
+      ...parsed,
+      distanceFromTarget,
+      mediaType: 'video'
+    };
+  } catch (error) {
+    console.error('[GeoSeeker] Failed to parse video verification JSON:', text);
+    throw new Error('Failed to verify video - invalid JSON response');
+  }
+}
+
+export async function verifyAudio(
+  base64Audio: string,
+  objective: string,
+  secretCriteria: string[],
+  userGps?: Coordinates,
+  targetGps?: Coordinates
+): Promise<VerificationResult> {
+  const model = getModel('verification');
+
+  // Calculate distance if GPS available
+  let distanceFromTarget: number | undefined;
+  if (userGps && targetGps) {
+    const distanceData = calculateStraightLineDistance(userGps, targetGps);
+    distanceFromTarget = distanceData.distanceMeters;
+  }
+
+  const prompt = `
+    Analyze this audio recording against the objective: "${objective}".
+    The user may be describing what they see, recording ambient sounds of the location, or providing other audio evidence.
+
+    Specifically listen for these criteria: ${secretCriteria.join(', ')}.
+
+    The audio is 10 seconds or less. Consider:
+    - Verbal descriptions of the location by the user
+    - Ambient sounds characteristic of the place (water flowing, traffic, birds, crowds, etc.)
+    - Any audio evidence that confirms the user is at the correct location
+
+    Be lenient with audio verification since it's harder to capture visual details through sound.
+    Accept descriptions that reasonably match the location even if not perfect.
+
+    Respond in JSON format:
+    {
+      "success": boolean,
+      "feedback": "A witty, personality-driven comment on the audio. If it failed, give a hint about what to listen for or describe.",
+      "appealable": boolean (true if close but not quite right, false if completely wrong)
+    }
+  `;
+
+  const audioPart = {
+    inlineData: {
+      data: base64Audio.split(',')[1],
+      mimeType: 'audio/webm',
+    },
+  };
+
+  const result = await model.generateContent([prompt, audioPart]);
+  const response = await result.response;
+  const text = response.text();
+
+  try {
+    const parsed = JSON.parse(text);
+    return {
+      ...parsed,
+      distanceFromTarget,
+      mediaType: 'audio'
+    };
+  } catch (error) {
+    console.error('[GeoSeeker] Failed to parse audio verification JSON:', text);
+    throw new Error('Failed to verify audio - invalid JSON response');
+  }
+}
+
+export async function verifyPhotoWithAppeal(
+  base64Image: string,
+  objective: string,
+  secretCriteria: string[],
+  appealData: AppealData,
+  questCoordinates: Coordinates
+): Promise<AppealResult> {
+  const model = getModel('verification');
+
+  // Calculate GPS confidence factor
+  const gpsConfidence = calculateGpsConfidence(appealData.distanceFromTarget);
+
+  const prompt = `
+    You are re-evaluating a photo after the user appealed your initial rejection.
+
+    ORIGINAL OBJECTIVE: "${objective}"
+    ORIGINAL CRITERIA: ${secretCriteria.join(', ')}
+
+    USER'S APPEAL:
+    "${appealData.userExplanation}"
+
+    GPS CONTEXT:
+    - User is ${appealData.distanceFromTarget}m from target location
+    - GPS Confidence: ${gpsConfidence.toFixed(2)} ${getGpsConfidenceLabel(gpsConfidence)}
+    ${gpsConfidence > 0.8 ? '- STRONG SIGNAL: User is very close to target!' : ''}
+
+    INSTRUCTIONS:
+    1. Consider if the user's explanation reveals legitimate environmental differences
+       (e.g., "The station here is green/yellow, not blue/yellow")
+    2. If GPS shows user is <30m from target, be more lenient with color/minor variations
+    3. However, if the photo shows COMPLETELY WRONG object (e.g., tree instead of building), reject
+    4. Balance: Real-world flexibility vs. preventing cheating
+
+    Respond in JSON format:
+    {
+      "success": boolean,
+      "feedback": "Witty response acknowledging their context or explaining continued rejection",
+      "reasoning": "Internal explanation of your decision",
+      "acceptedContext": boolean (did user's explanation help?),
+      "gpsWasHelpful": boolean (did GPS proximity influence your decision?)
+    }
+  `;
+
+  const imagePart = {
+    inlineData: {
+      data: base64Image.split(',')[1],
+      mimeType: 'image/jpeg',
+    },
+  };
+
+  const result = await model.generateContent([prompt, imagePart]);
+  const response = await result.response;
+  const text = response.text();
+
+  try {
+    return JSON.parse(text);
+  } catch (error) {
+    console.error('[GeoSeeker] Failed to parse appeal verification JSON:', text);
+    throw new Error('Failed to verify appeal - invalid JSON response');
   }
 }
