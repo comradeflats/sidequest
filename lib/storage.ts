@@ -209,7 +209,7 @@ export function getStorageSize(): { totalBytes: number; totalKB: number; totalMB
 }
 
 /**
- * Clear all GeoSeeker data from localStorage (for debugging/reset)
+ * Clear all SideQuest data from localStorage (for debugging/reset)
  */
 export function clearAllData(): void {
   try {
@@ -227,7 +227,7 @@ export function clearAllData(): void {
     }
 
     keys.forEach(key => localStorage.removeItem(key));
-    console.log(`[Storage] Cleared all GeoSeeker data (${keys.length} items)`);
+    console.log(`[Storage] Cleared all SideQuest data (${keys.length} items)`);
   } catch (error) {
     console.error('[Storage] Failed to clear all data:', error);
   }

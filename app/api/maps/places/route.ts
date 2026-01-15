@@ -64,12 +64,12 @@ export async function POST(request: Request) {
     const data = await response.json();
 
     // Log for debugging
-    console.log('[GeoSeeker] Places API response status:', response.status);
-    console.log('[GeoSeeker] Places found:', data.places?.length || 0);
+    console.log('[SideQuest] Places API response status:', response.status);
+    console.log('[SideQuest] Places found:', data.places?.length || 0);
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error('[GeoSeeker] Places API error:', error);
+    console.error('[SideQuest] Places API error:', error);
     return NextResponse.json({ error: 'Failed to fetch places' }, { status: 500 });
   }
 }

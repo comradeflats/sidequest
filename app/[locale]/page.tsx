@@ -456,7 +456,7 @@ export default function Home() {
             className="text-4xl font-pixel text-adventure-gold mb-3 drop-shadow-lg"
             style={{ fontSize: '2rem', lineHeight: '1.4' }}
           >
-            GEOSEEKER
+            SIDEQUEST
           </motion.h1>
           <p className="text-adventure-emerald text-sm font-sans italic">
             Explore your world, one quest at a time

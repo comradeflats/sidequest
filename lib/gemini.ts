@@ -31,7 +31,7 @@ export const getModel = (type: 'campaign' | 'verification' | 'image' = 'verifica
       break;
   }
 
-  console.log(`[GeoSeeker] Initializing Gemini 3 model: ${modelName} for task: ${type}`);
+  console.log(`[SideQuest] Initializing Gemini 3 model: ${modelName} for task: ${type}`);
 
   return genAI.getGenerativeModel({
     model: modelName,
@@ -88,7 +88,7 @@ export async function generateQuestImage(quest: Quest): Promise<string | null> {
 
     return null;
   } catch (error) {
-    console.error(`[GeoSeeker] Failed to generate image for quest ${quest.id}:`, error);
+    console.error(`[SideQuest] Failed to generate image for quest ${quest.id}:`, error);
     return null;
   }
 }

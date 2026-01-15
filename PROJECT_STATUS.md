@@ -1,4 +1,4 @@
-# 📊 GeoSeeker - Project Status
+# 📊 SideQuest - Project Status
 
 **Last Updated:** January 11, 2026
 **Version:** 0.1.0 (Gemini 3 Gameathon Submission)
@@ -8,7 +8,7 @@
 
 ## 🎯 Project Overview
 
-GeoSeeker is a location-based AR scavenger hunt game powered by Google Gemini 3. The application successfully integrates three Gemini 3 models to create an immersive, AI-driven gameplay experience with real-time photo verification and procedurally generated quests.
+SideQuest is a location-based AR scavenger hunt game powered by Google Gemini 3. The application successfully integrates three Gemini 3 models to create an immersive, AI-driven gameplay experience with real-time photo verification and procedurally generated quests.
 
 ---
 
@@ -395,7 +395,7 @@ All TypeScript, ESLint, and Tailwind dependencies working correctly.
 
 ## 🏆 Unique Selling Points
 
-### What Makes GeoSeeker Special
+### What Makes SideQuest Special
 
 1. **Triple Gemini 3 Integration**
    - Only game using Gemini 3 Flash, Flash Vision, AND Pro Image together
@@ -466,7 +466,7 @@ All TypeScript, ESLint, and Tailwind dependencies working correctly.
 
 ## 🎬 Conclusion
 
-**GeoSeeker is 100% functional and ready for hackathon submission** pending deployment. The application successfully demonstrates the power of Gemini 3 across multiple modalities (text, vision, image generation) in a novel, engaging use case.
+**SideQuest is 100% functional and ready for hackathon submission** pending deployment. The application successfully demonstrates the power of Gemini 3 across multiple modalities (text, vision, image generation) in a novel, engaging use case.
 
 ### Current State: ✅ **READY FOR DEMO**
 

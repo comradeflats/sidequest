@@ -11,9 +11,9 @@ export async function generateCampaign(
   const questCount = type === 'short' ? 3 : 5;
 
   // STEP 1: Geocode the starting location
-  console.log('[GeoSeeker] Geocoding location:', location);
+  console.log('[SideQuest] Geocoding location:', location);
   const locationData = await geocodeLocation(location);
-  console.log('[GeoSeeker] Coordinates:', locationData.coordinates);
+  console.log('[SideQuest] Coordinates:', locationData.coordinates);
 
   // STEP 2: Get quest locations using Places API (with fallback to random coordinates)
   const questLocations = await getQuestLocations(
@@ -21,7 +21,7 @@ export async function generateCampaign(
     distanceRange,
     questCount
   );
-  console.log('[GeoSeeker] Retrieved quest locations for', distanceRange, 'range');
+  console.log('[SideQuest] Retrieved quest locations for', distanceRange, 'range');
 
   // Extract coordinates from quest locations (whether PlaceData or Coordinates)
   const questCoords: Coordinates[] = questLocations.map((loc) =>
@@ -44,7 +44,7 @@ export async function generateCampaign(
   const totalTime = durations.reduce((sum, d) => sum + d, 0);
 
   console.log(
-    `[GeoSeeker] Total campaign: ${totalDistance.toFixed(1)}km, ~${totalTime} minutes walking`
+    `[SideQuest] Total campaign: ${totalDistance.toFixed(1)}km, ~${totalTime} minutes walking`
   );
 
   // STEP 4: Generate campaign with Gemini AI using real places
@@ -133,7 +133,7 @@ export async function generateCampaign(
     });
 
     // STEP 6: Generate images for all quests in parallel
-    console.log('[GeoSeeker] Generating quest images...');
+    console.log('[SideQuest] Generating quest images...');
     const questsWithImages = await Promise.all(
       questsWithMetadata.map(async (quest: Quest) => {
         const imageUrl = await generateQuestImage(quest);
@@ -155,7 +155,7 @@ export async function generateCampaign(
       estimatedTotalTime: totalTime,
     };
   } catch (error) {
-    console.error('[GeoSeeker] Failed to parse campaign JSON:', text);
+    console.error('[SideQuest] Failed to parse campaign JSON:', text);
     throw new Error('Failed to generate valid campaign JSON');
   }
 }
@@ -257,7 +257,7 @@ export async function verifyPhoto(
       mediaType: 'photo'
     };
   } catch (error) {
-    console.error('[GeoSeeker] Failed to parse photo verification JSON:', text);
+    console.error('[SideQuest] Failed to parse photo verification JSON:', text);
     throw new Error('Failed to verify photo - invalid JSON response');
   }
 }
@@ -319,7 +319,7 @@ export async function verifyPhotoWithAppeal(
   try {
     return JSON.parse(text);
   } catch (error) {
-    console.error('[GeoSeeker] Failed to parse appeal verification JSON:', text);
+    console.error('[SideQuest] Failed to parse appeal verification JSON:', text);
     throw new Error('Failed to verify appeal - invalid JSON response');
   }
 }

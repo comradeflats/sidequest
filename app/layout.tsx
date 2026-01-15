@@ -20,7 +20,7 @@ const pressStart2P = Press_Start_2P({
 });
 
 export const metadata: Metadata = {
-  title: "GeoSeeker - AI-Powered Location Quest Game",
+  title: "SideQuest - AI-Powered Location Quest Game",
   description: "Explore your world through AI-generated scavenger hunts powered by Gemini 3",
 };
 

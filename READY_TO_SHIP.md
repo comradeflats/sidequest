@@ -1,4 +1,4 @@
-# ✅ GeoSeeker - Ready to Ship!
+# ✅ SideQuest - Ready to Ship!
 
 **Date:** January 13, 2026
 **Status:** 🚀 PRODUCTION READY
@@ -286,7 +286,7 @@ You now have a:
 
 **Last Updated:** January 13, 2026
 **Author:** @comradeflats
-**Project:** GeoSeeker
+**Project:** SideQuest
 **Hackathon:** Gemini 3 Gameathon 2026
 
 🌍 **"Explore your world. One quest at a time."** ✨

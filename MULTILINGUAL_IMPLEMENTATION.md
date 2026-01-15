@@ -71,7 +71,7 @@ npm run generate-translations
 - [ ] Import `useTranslations` from 'next-intl'
 - [ ] Replace all hard-coded English strings with `t()` calls
 - [ ] Key areas:
-  - Header: "GEOSEEKER", tagline
+  - Header: "SIDEQUEST", tagline
   - Location setup: labels, placeholders, buttons
   - Campaign type selector
   - Distance range selector
@@ -250,7 +250,7 @@ import LanguageSelector from '@/components/LanguageSelector';
   </div>
 
   <motion.h1 /* ... */>
-    GEOSEEKER
+    SIDEQUEST
   </motion.h1>
 </header>
 ```
@@ -435,7 +435,7 @@ export interface StoredCampaign {
 
 ## 🎯 Success Criteria
 
-When complete, GeoSeeker should:
+When complete, SideQuest should:
 - ✅ Load in English by default
 - ✅ Support Vietnamese with `/vi` URL
 - ✅ Display all UI text in selected language

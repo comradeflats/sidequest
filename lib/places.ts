@@ -37,14 +37,14 @@ export async function findNearbyPlaces(
     });
 
     if (!response.ok) {
-      console.warn('[GeoSeeker] Places API request failed:', response.status);
+      console.warn('[SideQuest] Places API request failed:', response.status);
       return [];
     }
 
     const data = await response.json();
 
     if (!data.places || data.places.length === 0) {
-      console.warn('[GeoSeeker] No places found near location');
+      console.warn('[SideQuest] No places found near location');
       return [];
     }
 
@@ -60,10 +60,10 @@ export async function findNearbyPlaces(
       placeId: place.id || ''
     }));
 
-    console.log(`[GeoSeeker] Found ${places.length} places via Places API`);
+    console.log(`[SideQuest] Found ${places.length} places via Places API`);
     return places;
   } catch (error) {
-    console.error('[GeoSeeker] Places API error:', error);
+    console.error('[SideQuest] Places API error:', error);
     return [];
   }
 }
@@ -169,7 +169,7 @@ export function selectQuestPlaces(
     }
   }
 
-  console.log(`[GeoSeeker] Selected ${selected.length} diverse places for quests`);
+  console.log(`[SideQuest] Selected ${selected.length} diverse places for quests`);
   return selected;
 }
 
@@ -184,7 +184,7 @@ export function generateRandomQuestPoints(
   const config = DISTANCE_RANGES[distanceRange];
   const points: Coordinates[] = [];
 
-  console.warn('[GeoSeeker] Using random coordinate generation (Places API fallback)');
+  console.warn('[SideQuest] Using random coordinate generation (Places API fallback)');
 
   for (let i = 0; i < count; i++) {
     // Random angle in radians
@@ -224,14 +224,14 @@ export async function getQuestLocations(
     if (places && places.length >= count) {
       const selected = selectQuestPlaces(places, count, distanceRange);
       if (selected.length >= count) {
-        console.log('[GeoSeeker] Using Places API for quest locations');
+        console.log('[SideQuest] Using Places API for quest locations');
         return selected;
       }
     }
 
-    console.warn('[GeoSeeker] Insufficient places found, using fallback');
+    console.warn('[SideQuest] Insufficient places found, using fallback');
   } catch (error) {
-    console.error('[GeoSeeker] Places API failed, using fallback:', error);
+    console.error('[SideQuest] Places API failed, using fallback:', error);
   }
 
   // Fallback to random coordinates

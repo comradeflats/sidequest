@@ -1,4 +1,4 @@
-# 🏆 GeoSeeker - Hackathon Submission Status
+# 🏆 SideQuest - Hackathon Submission Status
 
 **Date:** January 13, 2026
 **Status:** ✅ READY FOR SUBMISSION
@@ -182,7 +182,7 @@ NEXT_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
 ## 🎬 Talking Points
 
 ### Opening
-"GeoSeeker transforms any city into an AI-powered scavenger hunt. Enter a location, and Gemini 3 generates culturally-relevant quests with 16-bit pixel art."
+"SideQuest transforms any city into an AI-powered scavenger hunt. Enter a location, and Gemini 3 generates culturally-relevant quests with 16-bit pixel art."
 
 ### Technical Deep Dive
 "We're using three Gemini 3 models: Flash for quest generation, Flash Vision for photo verification, and Pro Image for pixel art. The appeal system solves AI hallucination by letting users provide context."
@@ -247,7 +247,7 @@ NEXT_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
 **Developer:** @comradeflats
 **Hackathon:** Gemini 3 Gameathon 2026
 **Submission Date:** January 2026
-**Project Name:** GeoSeeker
+**Project Name:** SideQuest
 **Tagline:** "Explore your world. One quest at a time." 🌍✨
 
 ---

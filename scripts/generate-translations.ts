@@ -42,7 +42,7 @@ CRITICAL RULES:
    - If it has punctuation like "→" or "...", keep the same punctuation
    - Keep emoji and special characters (🎉, ✓, etc.)
 3. Preserve placeholders like {distance}, {duration}, {accuracy} - do not translate these
-4. Keep brand name "GeoSeeker" unchanged
+4. Keep brand name "SideQuest" unchanged
 5. Keep technical terms like "GPS", "Gemini 3" unchanged
 6. For UI labels, use standard ${languageName} conventions for buttons/actions
 7. Output ONLY valid JSON, no explanations or markdown code blocks
@@ -92,7 +92,7 @@ Output the complete translated JSON (raw JSON only, no markdown):`;
 }
 
 async function main() {
-  console.log('🚀 GeoSeeker Translation Generator');
+  console.log('🚀 SideQuest Translation Generator');
   console.log('===================================');
 
   try {

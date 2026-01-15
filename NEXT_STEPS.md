@@ -1,4 +1,4 @@
-# 🚀 GeoSeeker - Next Steps & Multi-Modal Roadmap
+# 🚀 SideQuest - Next Steps & Multi-Modal Roadmap
 
 **Created:** January 12, 2026
 **Last Updated:** January 13, 2026 (evening)
@@ -55,7 +55,7 @@
 - All features work in production mode
 
 ✅ **Step 2: Create GitHub Repository**
-- Repository created: `geoseeker`
+- Repository created: `sidequest`
 - Description: "AI-powered location-based scavenger hunt using Gemini 3"
 - Visibility: Public
 
@@ -525,7 +525,7 @@ Use **IndexedDB** for browser storage:
 ```typescript
 // lib/video-utils.ts
 export async function cacheVideo(questId: string, videoData: string): Promise<void> {
-  const db = await openDB('geoseeker-videos', 1, {
+  const db = await openDB('sidequest-videos', 1, {
     upgrade(db) {
       db.createObjectStore('videos', { keyPath: 'questId' });
     }
@@ -540,7 +540,7 @@ export async function cacheVideo(questId: string, videoData: string): Promise<vo
 }
 
 export async function getCachedVideo(questId: string): Promise<string | null> {
-  const db = await openDB('geoseeker-videos', 1);
+  const db = await openDB('sidequest-videos', 1);
   const cached = await db.get('videos', questId);
 
   if (cached && Date.now() - cached.timestamp < 7 * 24 * 60 * 60 * 1000) {

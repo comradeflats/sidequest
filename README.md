@@ -1,10 +1,10 @@
-# 🌍 GeoSeeker
+# 🎮 SideQuest
 
 > AI-powered location-based scavenger hunt game powered by **Google Gemini 3**
 
-GeoSeeker is an immersive AR-style scavenger hunt application that combines real-world exploration with AI-generated quests and visual verification. Built for the Gemini 3 Gameathon, it showcases the latest Google AI capabilities including text generation, vision analysis, and image synthesis.
+SideQuest is an immersive AR-style scavenger hunt application that combines real-world exploration with AI-generated quests and visual verification. Built for the Gemini 3 Gameathon, it showcases the latest Google AI capabilities including text generation, vision analysis, and image synthesis.
 
-![GeoSeeker](https://img.shields.io/badge/Powered%20by-Gemini%203-10b981?style=for-the-badge&logo=google)
+![SideQuest](https://img.shields.io/badge/Powered%20by-Gemini%203-10b981?style=for-the-badge&logo=google)
 ![Next.js](https://img.shields.io/badge/Next.js-16.1.1-black?style=for-the-badge&logo=next.js)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)
 
@@ -34,7 +34,7 @@ Major UX improvements based on real-world testing:
 
 ## 🎮 Game Overview
 
-**GeoSeeker** transforms your city into an interactive adventure playground. Enter any location worldwide, and Gemini 3 generates a personalized scavenger hunt with culturally relevant quests, complete with 16-bit pixel art visualizations.
+**SideQuest** transforms your city into an interactive adventure playground. Enter any location worldwide, and Gemini 3 generates a personalized scavenger hunt with culturally relevant quests, complete with 16-bit pixel art visualizations.
 
 ### How It Works
 
@@ -143,8 +143,8 @@ Major UX improvements based on real-world testing:
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/yourusername/geoseeker.git
-   cd geoseeker
+   git clone https://github.com/comradeflats/sidequest.git
+   cd sidequest
    ```
 
 2. **Install dependencies**
@@ -214,7 +214,7 @@ npm start
 ## 📁 Project Structure
 
 ```
-geoseeker/
+sidequest/
 ├── app/
 │   ├── page.tsx              # Main game interface
 │   ├── layout.tsx            # Root layout with metadata
@@ -301,10 +301,10 @@ geoseeker/
 ### Expected Console Logs
 
 ```
-[GeoSeeker] Initializing Gemini 3 model: gemini-3-flash-preview for task: campaign
-[GeoSeeker] Generating quest images...
-[GeoSeeker] Initializing Gemini 3 model: gemini-3-pro-image-preview for task: image
-[GeoSeeker] Initializing Gemini 3 model: gemini-3-flash-preview for task: verification
+[SideQuest] Initializing Gemini 3 model: gemini-3-flash-preview for task: campaign
+[SideQuest] Generating quest images...
+[SideQuest] Initializing Gemini 3 model: gemini-3-pro-image-preview for task: image
+[SideQuest] Initializing Gemini 3 model: gemini-3-flash-preview for task: verification
 ```
 
 ---
@@ -463,7 +463,7 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 ## 📞 Support
 
 ### Issues
-Report bugs or request features: [GitHub Issues](https://github.com/yourusername/geoseeker/issues)
+Report bugs or request features: [GitHub Issues](https://github.com/comradeflats/sidequest/issues)
 
 ### Documentation
 - [Gemini API Docs](https://ai.google.dev/gemini-api/docs)
@@ -492,4 +492,4 @@ Witty AI feedback on your photo attempts with clear success/failure indicators.
 **Built with ❤️ for the Gemini 3 Gameathon**
 
 *Explore your world. One quest at a time.* 🌍✨
-# geoseeker
+# sidequest
