@@ -109,14 +109,13 @@ export interface Campaign {
   estimatedTotalTime?: number;    // Total time estimate in minutes (walking)
 }
 
-// Media types for verification
-export type MediaType = 'photo' | 'video' | 'audio';
+// Media types for verification (photo only)
+export type MediaType = 'photo';
 
 // Media capture data
 export interface MediaCaptureData {
   type: MediaType;
   data: string; // base64 data URL
-  duration?: number; // seconds (for video/audio)
 }
 
 export interface VerificationResult {

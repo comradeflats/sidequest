@@ -2,8 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Compass, Zap, Map, CheckCircle, XCircle, Camera, Navigation, MessageSquare, ExternalLink } from 'lucide-react';
-import { generateCampaign, verifyPhoto, verifyVideo, verifyAudio, verifyPhotoWithAppeal } from '@/lib/game-logic';
+import { MapPin, Compass, Zap, Map, CheckCircle, XCircle, Camera, Navigation, MessageSquare, ExternalLink, RefreshCw, Crosshair } from 'lucide-react';
+import { generateCampaign, verifyPhoto, verifyPhotoWithAppeal } from '@/lib/game-logic';
 import { geocodeLocation } from '@/lib/location';
 import { generateQuestImage } from '@/lib/gemini';
 import { Campaign, VerificationResult, DistanceRange, LocationData, Coordinates, AppealData, MediaCaptureData } from '@/types';
@@ -65,13 +65,15 @@ export default function Home() {
 
   // Initialize GPS tracking hook
   const geoState = useGeolocation(gpsEnabled);
+  const { refreshLocation, isRefreshing } = geoState;
 
   // Initialize journey tracking hook
   const {
     journeyStats,
     recordPoint,
     markQuestComplete,
-    finalizeJourney
+    finalizeJourney,
+    resetWithStats
   } = useJourneyTracking({
     enabled: !!campaign,
     currentQuestIndex: campaign?.currentQuestIndex || 0,
@@ -191,6 +193,13 @@ export default function Home() {
     // Restore campaign with regenerated images
     setCampaign(stored.campaign);
     setCompletedQuests(stored.progress.completedQuests);
+
+    // Restore journey stats if available
+    if (stored.journeyStats) {
+      resetWithStats(stored.journeyStats);
+      console.log('[App] Restored journey stats from storage');
+    }
+
     setShowResumePrompt(false);
     setSavedCampaignId(null);
     console.log('[App] Resumed campaign from storage');
@@ -253,42 +262,18 @@ export default function Home() {
         params: {
           quest_id: currentQuest.id,
           quest_index: campaign.currentQuestIndex,
-          media_type: captureData.type
+          media_type: 'photo'
         }
       });
 
-      // Choose verification function based on media type
-      let verification: VerificationResult;
-
-      switch (captureData.type) {
-        case 'video':
-          verification = await verifyVideo(
-            captureData.data,
-            currentQuest.objective,
-            currentQuest.secretCriteria,
-            userGps || undefined,
-            currentQuest.coordinates
-          );
-          break;
-        case 'audio':
-          verification = await verifyAudio(
-            captureData.data,
-            currentQuest.objective,
-            currentQuest.secretCriteria,
-            userGps || undefined,
-            currentQuest.coordinates
-          );
-          break;
-        case 'photo':
-        default:
-          verification = await verifyPhoto(
-            captureData.data,
-            currentQuest.objective,
-            currentQuest.secretCriteria,
-            userGps || undefined,
-            currentQuest.coordinates
-          );
-      }
+      // Verify the photo
+      const verification = await verifyPhoto(
+        captureData.data,
+        currentQuest.objective,
+        currentQuest.secretCriteria,
+        userGps || undefined,
+        currentQuest.coordinates
+      );
 
       setResult(verification);
 
@@ -299,7 +284,7 @@ export default function Home() {
           params: {
             quest_id: currentQuest.id,
             quest_index: campaign.currentQuestIndex,
-            media_type: captureData.type
+            media_type: 'photo'
           }
         });
       } else {
@@ -309,7 +294,7 @@ export default function Home() {
             quest_id: currentQuest.id,
             quest_index: campaign.currentQuestIndex,
             appealable: verification.appealable || false,
-            media_type: captureData.type
+            media_type: 'photo'
           }
         });
       }
@@ -798,6 +783,45 @@ export default function Home() {
 
                       {/* Action Buttons */}
                       <div className="space-y-3 mt-6">
+                        {/* GPS Status Display */}
+                        {gpsEnabled && (
+                          <div className="flex items-center justify-between bg-zinc-900/50 rounded-lg px-4 py-3">
+                            <div className="flex items-center gap-2">
+                              <Crosshair className={`w-4 h-4 ${
+                                gpsAccuracy && gpsAccuracy <= 30 ? 'text-green-500' :
+                                gpsAccuracy && gpsAccuracy <= 100 ? 'text-yellow-500' :
+                                'text-red-500'
+                              }`} />
+                              <div className="text-xs font-sans">
+                                {gpsAccuracy ? (
+                                  <span className={
+                                    gpsAccuracy <= 30 ? 'text-green-400' :
+                                    gpsAccuracy <= 100 ? 'text-yellow-400' :
+                                    'text-red-400'
+                                  }>
+                                    GPS: ±{gpsAccuracy.toFixed(0)}m
+                                  </span>
+                                ) : (
+                                  <span className="text-gray-500">GPS: waiting...</span>
+                                )}
+                              </div>
+                            </div>
+                            <button
+                              onClick={async () => {
+                                const coords = await refreshLocation();
+                                if (coords) {
+                                  setUserGps(coords);
+                                }
+                              }}
+                              disabled={isRefreshing}
+                              className="flex items-center gap-1.5 text-xs font-pixel text-adventure-sky hover:text-white transition-colors disabled:opacity-50"
+                            >
+                              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                              {isRefreshing ? 'UPDATING...' : 'REFRESH'}
+                            </button>
+                          </div>
+                        )}
+
                         {/* View Area Button */}
                         {currentQuest.coordinates && (
                           <button

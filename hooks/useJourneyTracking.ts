@@ -8,31 +8,49 @@ const MAX_ACCURACY_METERS = 50; // Ignore points with poor accuracy
 interface UseJourneyTrackingProps {
   enabled: boolean;
   currentQuestIndex: number;
+  initialStats?: JourneyStats | null;
   onJourneyUpdate?: (stats: JourneyStats) => void;
 }
 
 export function useJourneyTracking({
   enabled,
   currentQuestIndex,
+  initialStats,
   onJourneyUpdate
 }: UseJourneyTrackingProps) {
-  const [journeyStats, setJourneyStats] = useState<JourneyStats | null>(null);
+  const [journeyStats, setJourneyStats] = useState<JourneyStats | null>(initialStats || null);
   const lastRecordedPoint = useRef<JourneyPoint | null>(null);
   const lastRecordedTime = useRef<number>(0);
+  const hasInitialized = useRef(false);
 
-  // Initialize journey when tracking starts
+  // Initialize journey when tracking starts (only if no initial stats provided)
   useEffect(() => {
-    if (enabled && !journeyStats) {
-      const initialStats: JourneyStats = {
+    if (enabled && !journeyStats && !hasInitialized.current) {
+      hasInitialized.current = true;
+      const newStats: JourneyStats = {
         totalDistanceTraveled: 0,
         startTime: new Date(),
         durationMinutes: 0,
         pathPoints: [],
         questCompletionTimes: []
       };
-      setJourneyStats(initialStats);
+      setJourneyStats(newStats);
     }
   }, [enabled, journeyStats]);
+
+  // Allow external initialization (for resume)
+  useEffect(() => {
+    if (initialStats && !journeyStats) {
+      setJourneyStats(initialStats);
+      // Restore last recorded point from path history
+      if (initialStats.pathPoints.length > 0) {
+        const lastPoint = initialStats.pathPoints[initialStats.pathPoints.length - 1];
+        lastRecordedPoint.current = lastPoint;
+        lastRecordedTime.current = new Date(lastPoint.timestamp).getTime();
+      }
+      hasInitialized.current = true;
+    }
+  }, [initialStats, journeyStats]);
 
   // Calculate distance between two points (Haversine)
   const calculateDistance = useCallback((
@@ -171,10 +189,28 @@ export function useJourneyTracking({
     return finalStats;
   }, [journeyStats]);
 
+  // Reset journey with saved stats (for resume)
+  const resetWithStats = useCallback((stats: JourneyStats) => {
+    setJourneyStats(stats);
+    // Restore last recorded point from path history
+    if (stats.pathPoints.length > 0) {
+      const lastPoint = stats.pathPoints[stats.pathPoints.length - 1];
+      lastRecordedPoint.current = lastPoint;
+      lastRecordedTime.current = new Date(lastPoint.timestamp).getTime();
+    }
+    hasInitialized.current = true;
+    console.log('[Journey] Restored stats from save:', {
+      totalKm: stats.totalDistanceTraveled.toFixed(2),
+      points: stats.pathPoints.length,
+      duration: stats.durationMinutes
+    });
+  }, []);
+
   return {
     journeyStats,
     recordPoint,
     markQuestComplete,
-    finalizeJourney
+    finalizeJourney,
+    resetWithStats
   };
 }

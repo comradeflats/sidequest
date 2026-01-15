@@ -2,9 +2,9 @@
 
 export type AnalyticsEvent =
   | { name: 'campaign_created'; params: { location: string; type: 'short' | 'long'; distance_range: string; quest_count: number } }
-  | { name: 'verification_attempt'; params: { quest_id: string; quest_index: number; media_type: 'photo' | 'video' | 'audio' } }
-  | { name: 'verification_success'; params: { quest_id: string; quest_index: number; media_type: 'photo' | 'video' | 'audio' } }
-  | { name: 'verification_failure'; params: { quest_id: string; quest_index: number; appealable: boolean; media_type: 'photo' | 'video' | 'audio' } }
+  | { name: 'verification_attempt'; params: { quest_id: string; quest_index: number; media_type: 'photo' } }
+  | { name: 'verification_success'; params: { quest_id: string; quest_index: number; media_type: 'photo' } }
+  | { name: 'verification_failure'; params: { quest_id: string; quest_index: number; appealable: boolean; media_type: 'photo' } }
   | { name: 'appeal_submitted'; params: { quest_id: string; gps_distance: number | null } }
   | { name: 'appeal_success'; params: { quest_id: string } }
   | { name: 'quest_completed'; params: { quest_id: string; quest_index: number; total_quests: number } }
