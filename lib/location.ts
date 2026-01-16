@@ -7,6 +7,7 @@
  */
 
 import { Coordinates, LocationData, DistanceData } from '@/types';
+import { costEstimator } from './cost-estimator';
 
 // We still check if the key is present in env to fail fast, but the actual key usage is on the server.
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
@@ -24,6 +25,9 @@ export async function geocodeLocation(locationString: string): Promise<LocationD
   }
 
   try {
+    // Track API call cost
+    costEstimator.trackMapsGeocodeCall();
+
     // Call our own API route instead of Google directly to avoid CORS
     const url = `/api/maps/geocode?address=${encodeURIComponent(locationString)}`;
 
@@ -87,6 +91,9 @@ export async function calculateDistance(
       destination: `${destination.lat},${destination.lng}`,
       mode: travelMode
     });
+
+    // Track API call cost (1 element)
+    costEstimator.trackMapsDistanceCall(1);
 
     const response = await fetch('/api/maps/distance', {
       method: 'POST',
@@ -154,6 +161,9 @@ export async function calculateDistances(
 
   try {
     const destString = destinations.map((d) => `${d.lat},${d.lng}`).join('|');
+
+    // Track API call cost (N elements)
+    costEstimator.trackMapsDistanceCall(destinations.length);
 
     const response = await fetch('/api/maps/distance', {
       method: 'POST',

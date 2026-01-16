@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Compass, Zap, Map, CheckCircle, XCircle, Camera, Navigation, MessageSquare, ExternalLink, RefreshCw, Crosshair } from 'lucide-react';
 import { generateCampaign, verifyPhoto, verifyPhotoWithAppeal } from '@/lib/game-logic';
@@ -17,6 +17,7 @@ import JourneyMap from '@/components/JourneyMap';
 import JourneyStatsCard from '@/components/JourneyStatsCard';
 import QuestBook from '@/components/QuestBook';
 import LoadingProgress from '@/components/LoadingProgress';
+import QuestPreview from '@/components/QuestPreview';
 import {
   getCurrentCampaignId,
   loadCampaign,
@@ -58,14 +59,19 @@ export default function Home() {
   const [completedQuests, setCompletedQuests] = useState<string[]>([]);
   const [showResumePrompt, setShowResumePrompt] = useState(false);
   const [savedCampaignId, setSavedCampaignId] = useState<string | null>(null);
+  const [isResuming, setIsResuming] = useState(false);
 
   // Quest Book State
   const [showQuestBook, setShowQuestBook] = useState(false);
   const [campaignHistory, setCampaignHistory] = useState<any[]>([]);
 
+  // Ref for auto-scrolling to loading area
+  const loadingRef = useRef<HTMLDivElement>(null);
+
   // Initialize GPS tracking hook
   const geoState = useGeolocation(gpsEnabled);
-  const { refreshLocation, isRefreshing } = geoState;
+  const { refreshLocation, isRefreshing, error: gpsError, permissionStatus } = geoState;
+  const [gpsRefreshFailed, setGpsRefreshFailed] = useState(false);
 
   // Initialize journey tracking hook
   const {
@@ -109,15 +115,18 @@ export default function Home() {
 
   // Restore campaign on mount
   useEffect(() => {
-    const activeCampaignId = getCurrentCampaignId();
-    if (activeCampaignId && !campaign) {
-      const stored = loadCampaign(activeCampaignId);
-      if (stored && !stored.completedAt) {
-        // Show resume prompt
-        setSavedCampaignId(activeCampaignId);
-        setShowResumePrompt(true);
+    const checkForExistingCampaign = async () => {
+      const activeCampaignId = await getCurrentCampaignId();
+      if (activeCampaignId && !campaign) {
+        const stored = await loadCampaign(activeCampaignId);
+        if (stored && !stored.completedAt) {
+          // Always show resume prompt - images will be loaded from Firebase or regenerated if missing
+          setSavedCampaignId(activeCampaignId);
+          setShowResumePrompt(true);
+        }
       }
-    }
+    };
+    checkForExistingCampaign();
   }, []); // Run once on mount
 
   // Auto-save campaign when state changes
@@ -137,9 +146,22 @@ export default function Home() {
 
   // Load campaign history when component mounts or campaign changes
   useEffect(() => {
-    const history = getCampaignHistory();
-    setCampaignHistory(history);
+    const loadHistory = async () => {
+      const history = await getCampaignHistory();
+      setCampaignHistory(history);
+    };
+    loadHistory();
   }, [campaign]); // Refresh when campaign changes (e.g., completion)
+
+  // Auto-scroll to loading area when loading starts
+  useEffect(() => {
+    if (isLoading && loadingRef.current) {
+      // Small delay to ensure the loading component is rendered
+      setTimeout(() => {
+        loadingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }, 100);
+    }
+  }, [isLoading]);
 
   const handleGeocodeLocation = async () => {
     if (!location.trim()) return;
@@ -166,31 +188,56 @@ export default function Home() {
   const handleResumeCampaign = async () => {
     if (!savedCampaignId) return;
 
-    const stored = loadCampaign(savedCampaignId);
-    if (!stored) return;
+    const stored = await loadCampaign(savedCampaignId);
+    if (!stored) {
+      // Handle case where stored campaign is corrupted or missing
+      setShowResumePrompt(false);
+      setSavedCampaignId(null);
+      return;
+    }
 
-    // Check if images need to be regenerated
+    setShowResumePrompt(false);
+
+    // Check if images need to be regenerated (Firebase will provide images if available)
     const questsNeedingImages = stored.campaign.quests.filter(q => !q.imageUrl);
 
     if (questsNeedingImages.length > 0) {
+      // Show loading only if we need to regenerate images
       setIsLoading(true);
-      console.log(`[App] Regenerating ${questsNeedingImages.length} quest images...`);
+      setIsResuming(true);
 
-      // Regenerate missing images
-      for (const quest of questsNeedingImages) {
-        try {
-          const imageUrl = await generateQuestImage(quest);
-          quest.imageUrl = imageUrl || undefined;
-        } catch (error) {
-          console.error(`[App] Failed to regenerate image for quest ${quest.id}:`, error);
-          quest.imageUrl = undefined;
+      try {
+        console.log(`[App] Regenerating ${questsNeedingImages.length} quest images in parallel...`);
+
+        // Regenerate images in parallel for faster loading
+        const imagePromises = questsNeedingImages.map(async (quest) => {
+          try {
+            const imageUrl = await generateQuestImage(quest);
+            return { questId: quest.id, imageUrl: imageUrl || undefined };
+          } catch (error) {
+            console.error(`[App] Failed to regenerate image for quest ${quest.id}:`, error);
+            return { questId: quest.id, imageUrl: undefined };
+          }
+        });
+
+        const results = await Promise.all(imagePromises);
+
+        // Apply the regenerated images to quests
+        for (const result of results) {
+          const quest = stored.campaign.quests.find(q => q.id === result.questId);
+          if (quest) {
+            quest.imageUrl = result.imageUrl;
+          }
         }
+      } catch (error) {
+        console.error('[App] Failed to regenerate images:', error);
+      } finally {
+        setIsLoading(false);
+        setIsResuming(false);
       }
-
-      setIsLoading(false);
     }
 
-    // Restore campaign with regenerated images
+    // Restore campaign (with existing or regenerated images)
     setCampaign(stored.campaign);
     setCompletedQuests(stored.progress.completedQuests);
 
@@ -200,14 +247,30 @@ export default function Home() {
       console.log('[App] Restored journey stats from storage');
     }
 
-    setShowResumePrompt(false);
     setSavedCampaignId(null);
     console.log('[App] Resumed campaign from storage');
   };
 
-  const handleDeclineResume = () => {
+  // Rotating messages for different loading states
+  const RESUME_MESSAGES = [
+    "RESTORING YOUR ADVENTURE...",
+    "LOADING QUEST DATA...",
+    "REGENERATING QUEST IMAGES...",
+    "PREPARING YOUR JOURNEY..."
+  ];
+
+  const GENERATE_MESSAGES = [
+    "SCOUTING THE AREA...",
+    "PLANNING YOUR ADVENTURE...",
+    "DISCOVERING HIDDEN SPOTS...",
+    "CHARTING YOUR COURSE...",
+    "CONSULTING ANCIENT MAPS...",
+    "FINDING LEGENDARY LOCATIONS..."
+  ];
+
+  const handleDeclineResume = async () => {
     if (savedCampaignId) {
-      clearCurrentCampaign();
+      await clearCurrentCampaign();
     }
     setShowResumePrompt(false);
     setSavedCampaignId(null);
@@ -217,7 +280,7 @@ export default function Home() {
     if (!geocodedLocation || !distanceRange) return;
 
     // Clear any previous campaign
-    clearCurrentCampaign();
+    await clearCurrentCampaign();
     setCompletedQuests([]);
 
     setIsLoading(true);
@@ -362,7 +425,7 @@ export default function Home() {
     }
   };
 
-  const nextQuest = () => {
+  const nextQuest = async () => {
     if (!campaign) return;
 
     // Mark quest as complete in journey
@@ -389,7 +452,7 @@ export default function Home() {
       setIsVerifying(false);
     } else {
       // Campaign complete! Mark it and add to history
-      markCampaignComplete(campaign.id);
+      await markCampaignComplete(campaign.id);
       addToHistory(campaign.id);
 
       // Finalize journey before showing completion
@@ -416,22 +479,31 @@ export default function Home() {
     setIsVerifying(false);
   };
 
-  // Open quest area on Google Maps (with fuzzy location)
-  const viewQuestArea = (coordinates: Coordinates) => {
-    // Add random offset to coordinates (25-50 meters in random direction)
-    const offsetMeters = 25 + Math.random() * 25; // 25-50m offset
-    const angle = Math.random() * 2 * Math.PI; // Random direction
+  // Open quest location on Google Maps - prefer place name over coordinates
+  const viewQuestArea = (quest: { coordinates?: Coordinates; placeName?: string; title?: string }) => {
+    let searchQuery: string | null = null;
 
-    // Convert meters to degrees (rough approximation)
-    const latOffset = (offsetMeters / 111320) * Math.cos(angle);
-    const lngOffset = (offsetMeters / (111320 * Math.cos(coordinates.lat * Math.PI / 180))) * Math.sin(angle);
+    // Priority 1: Use actual place name from Places API
+    if (quest.placeName) {
+      searchQuery = quest.placeName;
+    }
+    // Priority 2: Use quest title (usually contains the place name)
+    else if (quest.title) {
+      searchQuery = quest.title;
+    }
 
-    const fuzzedLat = coordinates.lat + latOffset;
-    const fuzzedLng = coordinates.lng + lngOffset;
+    // Build URL
+    let url: string;
+    if (searchQuery) {
+      // Search by name - Google Maps will find the exact location
+      url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}`;
+    } else if (quest.coordinates) {
+      // Fallback: use coordinates
+      url = `https://www.google.com/maps/search/?api=1&query=${quest.coordinates.lat},${quest.coordinates.lng}`;
+    } else {
+      return; // No location data available
+    }
 
-    // Open Google Maps at zoomed out level showing the general area
-    // Zoom level 16 shows neighborhood, 17 shows blocks
-    const url = `https://www.google.com/maps/@${fuzzedLat},${fuzzedLng},16z`;
     window.open(url, '_blank');
   };
 
@@ -633,10 +705,13 @@ export default function Home() {
 
               {/* Loading State */}
               {isLoading && (
-                <LoadingProgress
-                  message="GENERATING YOUR ADVENTURE..."
-                  subMessage="Creating quests with Gemini 3"
-                />
+                <div ref={loadingRef}>
+                  <LoadingProgress
+                    message={isResuming ? "RESTORING YOUR ADVENTURE..." : "GENERATING YOUR ADVENTURE..."}
+                    subMessage={isResuming ? "Loading your saved progress" : "Creating quests with Gemini 3"}
+                    rotatingMessages={isResuming ? RESUME_MESSAGES : GENERATE_MESSAGES}
+                  />
+                </div>
               )}
             </motion.div>
           ) : isVerifying ? (
@@ -785,52 +860,80 @@ export default function Home() {
                       <div className="space-y-3 mt-6">
                         {/* GPS Status Display */}
                         {gpsEnabled && (
-                          <div className="flex items-center justify-between bg-zinc-900/50 rounded-lg px-4 py-3">
-                            <div className="flex items-center gap-2">
-                              <Crosshair className={`w-4 h-4 ${
-                                gpsAccuracy && gpsAccuracy <= 30 ? 'text-green-500' :
-                                gpsAccuracy && gpsAccuracy <= 100 ? 'text-yellow-500' :
-                                'text-red-500'
-                              }`} />
-                              <div className="text-xs font-sans">
-                                {gpsAccuracy ? (
-                                  <span className={
-                                    gpsAccuracy <= 30 ? 'text-green-400' :
-                                    gpsAccuracy <= 100 ? 'text-yellow-400' :
-                                    'text-red-400'
-                                  }>
-                                    GPS: ±{gpsAccuracy.toFixed(0)}m
-                                  </span>
-                                ) : (
-                                  <span className="text-gray-500">GPS: waiting...</span>
-                                )}
+                          <div className="bg-zinc-900/50 rounded-lg px-4 py-3 space-y-2">
+                            <div className="flex items-center justify-between">
+                              <div className="flex items-center gap-2">
+                                <Crosshair className={`w-4 h-4 ${
+                                  permissionStatus === 'denied' ? 'text-red-500' :
+                                  gpsAccuracy && gpsAccuracy <= 30 ? 'text-green-500' :
+                                  gpsAccuracy && gpsAccuracy <= 100 ? 'text-yellow-500' :
+                                  'text-red-500'
+                                }`} />
+                                <div className="text-xs font-sans">
+                                  {permissionStatus === 'denied' ? (
+                                    <span className="text-red-400">GPS: Permission denied</span>
+                                  ) : gpsAccuracy ? (
+                                    <span className={
+                                      gpsAccuracy <= 30 ? 'text-green-400' :
+                                      gpsAccuracy <= 100 ? 'text-yellow-400' :
+                                      'text-red-400'
+                                    }>
+                                      GPS: ±{gpsAccuracy.toFixed(0)}m
+                                    </span>
+                                  ) : gpsError ? (
+                                    <span className="text-red-400">GPS: {gpsError.length > 20 ? 'Unavailable' : gpsError}</span>
+                                  ) : (
+                                    <span className="text-gray-500">GPS: waiting...</span>
+                                  )}
+                                </div>
                               </div>
+                              <button
+                                onClick={async () => {
+                                  setGpsRefreshFailed(false);
+                                  const coords = await refreshLocation();
+                                  if (coords) {
+                                    setUserGps(coords);
+                                  } else {
+                                    setGpsRefreshFailed(true);
+                                    // Auto-hide error after 3 seconds
+                                    setTimeout(() => setGpsRefreshFailed(false), 3000);
+                                  }
+                                }}
+                                disabled={isRefreshing || permissionStatus === 'denied'}
+                                className="flex items-center gap-1.5 text-xs font-pixel text-adventure-sky hover:text-white transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
+                                {isRefreshing ? 'UPDATING...' : 'REFRESH'}
+                              </button>
                             </div>
-                            <button
-                              onClick={async () => {
-                                const coords = await refreshLocation();
-                                if (coords) {
-                                  setUserGps(coords);
-                                }
-                              }}
-                              disabled={isRefreshing}
-                              className="flex items-center gap-1.5 text-xs font-pixel text-adventure-sky hover:text-white transition-colors disabled:opacity-50"
-                            >
-                              <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-                              {isRefreshing ? 'UPDATING...' : 'REFRESH'}
-                            </button>
+                            {/* GPS Error Feedback */}
+                            {gpsRefreshFailed && (
+                              <motion.div
+                                initial={{ opacity: 0, height: 0 }}
+                                animate={{ opacity: 1, height: 'auto' }}
+                                exit={{ opacity: 0, height: 0 }}
+                                className="text-xs text-red-400 font-sans bg-red-500/10 rounded px-2 py-1"
+                              >
+                                Could not refresh location. Try moving outdoors or check GPS permissions.
+                              </motion.div>
+                            )}
+                            {permissionStatus === 'denied' && (
+                              <div className="text-xs text-red-400 font-sans bg-red-500/10 rounded px-2 py-1">
+                                GPS access denied. Enable location in your browser settings.
+                              </div>
+                            )}
                           </div>
                         )}
 
-                        {/* View Area Button */}
-                        {currentQuest.coordinates && (
+                        {/* View on Google Maps Button */}
+                        {(currentQuest.coordinates || currentQuest.placeName || currentQuest.title) && (
                           <button
                             className="w-full border-2 border-adventure-sky text-adventure-sky font-pixel py-3 px-6 rounded-lg hover:bg-adventure-sky/10 transition-colors flex items-center justify-center gap-2"
-                            onClick={() => viewQuestArea(currentQuest.coordinates!)}
+                            onClick={() => viewQuestArea(currentQuest)}
                             style={{ fontSize: '0.75rem' }}
                           >
                             <ExternalLink className="w-4 h-4" />
-                            VIEW AREA ON MAP
+                            OPEN IN GOOGLE MAPS
                           </button>
                         )}
 
@@ -849,6 +952,27 @@ export default function Home() {
                     {/* Journey Stats Card */}
                     {journeyStats && journeyStats.pathPoints.length > 0 && (
                       <JourneyStatsCard journeyStats={journeyStats} />
+                    )}
+
+                    {/* Upcoming Quests Preview */}
+                    {campaign.quests.length > 1 && campaign.currentQuestIndex < campaign.quests.length - 1 && (
+                      <div className="space-y-3">
+                        <h3 className="text-xs font-pixel text-zinc-500 flex items-center gap-2">
+                          <span>UPCOMING QUESTS</span>
+                          <div className="flex-1 h-px bg-zinc-800" />
+                        </h3>
+                        <div className="space-y-2">
+                          {campaign.quests.slice(campaign.currentQuestIndex + 1, campaign.currentQuestIndex + 3).map((upcomingQuest, idx) => (
+                            <QuestPreview
+                              key={upcomingQuest.id}
+                              quest={upcomingQuest}
+                              questNumber={campaign.currentQuestIndex + 2 + idx}
+                              totalQuests={totalQuests}
+                              revealLevel={idx === 0 ? 'next' : 'hidden'}
+                            />
+                          ))}
+                        </div>
+                      </div>
                     )}
 
                     {/* Campaign Progress */}

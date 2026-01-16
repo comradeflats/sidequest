@@ -159,7 +159,21 @@ body {
 .font-pixel {
   font-family: var(--font-pixel), "Arial", "Helvetica", sans-serif;
   text-transform: uppercase;
-  letter-spacing: 0.05em;
+  letter-spacing: 0.02em;
+}
+
+/* Compact variant for tighter spacing */
+.font-pixel-compact {
+  font-family: var(--font-pixel), "Arial", "Helvetica", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0;
+}
+
+/* Wide variant for more dramatic headers */
+.font-pixel-wide {
+  font-family: var(--font-pixel), "Arial", "Helvetica", sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
 }
 
 /* Adventure Theme Colors */

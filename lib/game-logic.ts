@@ -1,6 +1,7 @@
 import { getModel, generateQuestImage } from './gemini';
 import { geocodeLocation, calculateDistance } from './location';
 import { getQuestLocations } from './places';
+import { costEstimator } from './cost-estimator';
 import { Campaign, Quest, DistanceRange, DISTANCE_RANGES, PlaceData, Coordinates, AppealData, AppealResult, VerificationResult } from '../types';
 
 export async function generateCampaign(
@@ -110,9 +111,15 @@ export async function generateCampaign(
     Make the quests feel like an exciting walking adventure through real places!
   `;
 
+  // Track Input Tokens
+  costEstimator.trackGeminiInput(prompt.length);
+
   const result = await model.generateContent(prompt);
   const response = await result.response;
   const text = response.text();
+
+  // Track Output Tokens
+  costEstimator.trackGeminiOutput(text.length);
 
   try {
     const campaignData = JSON.parse(text);
@@ -243,9 +250,17 @@ export async function verifyPhoto(
     },
   };
 
+  // Track Input Tokens (approx for text) + Image Input?
+  // Gemini 1.5 Flash vision input is token based.
+  // 1 image = 258 tokens (approx)
+  costEstimator.trackGeminiInput(prompt.length + 1000); // Adding ~1000 chars buffer for image token equivalent
+
   const result = await model.generateContent([prompt, imagePart]);
   const response = await result.response;
   const text = response.text();
+
+  // Track Output Tokens
+  costEstimator.trackGeminiOutput(text.length);
 
   // Since the model is configured with responseMimeType: "application/json",
   // the response is already pure JSON, no need for regex extraction
@@ -312,9 +327,15 @@ export async function verifyPhotoWithAppeal(
     },
   };
 
+  // Track Input Tokens (approx text + image)
+  costEstimator.trackGeminiInput(prompt.length + 1000);
+
   const result = await model.generateContent([prompt, imagePart]);
   const response = await result.response;
   const text = response.text();
+
+  // Track Output Tokens
+  costEstimator.trackGeminiOutput(text.length);
 
   try {
     return JSON.parse(text);

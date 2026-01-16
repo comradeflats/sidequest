@@ -1,4 +1,5 @@
 import { Coordinates, PlaceData, DistanceRange, DISTANCE_RANGES } from '@/types';
+import { costEstimator } from './cost-estimator';
 
 /**
  * Find nearby places using Google Places API
@@ -10,6 +11,9 @@ export async function findNearbyPlaces(
   const config = DISTANCE_RANGES[distanceRange];
 
   try {
+    // Track API call cost
+    costEstimator.trackMapsPlacesCall();
+
     const response = await fetch('/api/maps/places', {
       method: 'POST',
       headers: {
@@ -19,19 +23,22 @@ export async function findNearbyPlaces(
         latitude: center.lat,
         longitude: center.lng,
         radius: config.radiusMeters,
+        // Places API (New) valid types only
         includedTypes: [
           'tourist_attraction',
-          'landmark',
           'park',
           'museum',
-          'point_of_interest',
           'art_gallery',
           'church',
           'hindu_temple',
           'mosque',
           'synagogue',
           'shopping_mall',
-          'stadium'
+          'stadium',
+          'cultural_center',
+          'historical_landmark',
+          'monument',
+          'visitor_center'
         ]
       })
     });

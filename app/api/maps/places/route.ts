@@ -31,12 +31,12 @@ export async function POST(request: Request) {
           radius: parseFloat(radius)
         }
       },
+      // Places API (New) valid types - see: https://developers.google.com/maps/documentation/places/web-service/place-types
+      // Using "Table A" primary types only
       includedTypes: includedTypes || [
         'tourist_attraction',
-        'landmark',
         'park',
         'museum',
-        'point_of_interest',
         'art_gallery',
         'church',
         'hindu_temple',
@@ -45,7 +45,13 @@ export async function POST(request: Request) {
         'shopping_mall',
         'cafe',
         'restaurant',
-        'stadium'
+        'stadium',
+        'cultural_center',
+        'historical_landmark',
+        'monument',
+        'performing_arts_theater',
+        'visitor_center',
+        'zoo'
       ],
       maxResultCount: 20,
       languageCode: 'en'
@@ -65,7 +71,13 @@ export async function POST(request: Request) {
 
     // Log for debugging
     console.log('[SideQuest] Places API response status:', response.status);
-    console.log('[SideQuest] Places found:', data.places?.length || 0);
+
+    // Log error details if request failed
+    if (!response.ok) {
+      console.error('[SideQuest] Places API error response:', JSON.stringify(data, null, 2));
+    } else {
+      console.log('[SideQuest] Places found:', data.places?.length || 0);
+    }
 
     return NextResponse.json(data);
   } catch (error) {

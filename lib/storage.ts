@@ -1,4 +1,10 @@
 import { Campaign, VerificationResult, JourneyStats, StoredCampaign } from '../types';
+import {
+  saveCampaignImages,
+  loadCampaignImages,
+  deleteImagesForCampaign,
+  isIndexedDBAvailable,
+} from './indexeddb-storage';
 
 // Storage keys
 const CURRENT_CAMPAIGN_KEY = 'current_campaign_id';
@@ -6,9 +12,38 @@ const CAMPAIGN_HISTORY_KEY = 'campaign_history';
 const MAX_HISTORY_SIZE = 10;
 
 /**
- * Save a campaign to localStorage
+ * Save a campaign to storage (IndexedDB for images, localStorage for metadata)
  */
-export function saveCampaign(
+export async function saveCampaign(
+  campaign: Campaign,
+  progress: {
+    currentQuestIndex: number;
+    completedQuests: string[];
+    verificationResults?: Record<string, VerificationResult>;
+  },
+  journeyStats?: JourneyStats
+): Promise<void> {
+  // Debug: Check if campaign has images
+  const questsWithImages = campaign.quests.filter(q => q.imageUrl);
+  console.log(`[Storage] Campaign has ${questsWithImages.length}/${campaign.quests.length} quests with images`);
+
+  // Save images to IndexedDB (if available)
+  if (isIndexedDBAvailable()) {
+    try {
+      await saveCampaignImages(campaign.id, campaign.quests);
+    } catch (error) {
+      console.warn('[Storage] Failed to save images to IndexedDB:', error);
+    }
+  }
+
+  // Save campaign metadata to localStorage (without images to stay under quota)
+  saveToLocalStorage(campaign, progress, journeyStats);
+}
+
+/**
+ * Save campaign metadata to localStorage (without images)
+ */
+function saveToLocalStorage(
   campaign: Campaign,
   progress: {
     currentQuestIndex: number;
@@ -18,18 +53,17 @@ export function saveCampaign(
   journeyStats?: JourneyStats
 ): void {
   try {
-    // Create a lightweight copy WITHOUT base64 images to avoid quota errors
-    const campaignToStore = {
+    // Always save without images to localStorage (images are in IndexedDB)
+    const campaignWithoutImages = {
       ...campaign,
       quests: campaign.quests.map(quest => ({
         ...quest,
-        imageUrl: undefined,  // Strip base64 images (will regenerate on resume)
-        // Keep all other quest metadata
+        imageUrl: undefined
       }))
     };
 
     const stored: StoredCampaign = {
-      campaign: campaignToStore,  // Use stripped version
+      campaign: campaignWithoutImages,
       completedAt: null,
       lastPlayedAt: new Date(),
       progress: {
@@ -40,25 +74,62 @@ export function saveCampaign(
       journeyStats
     };
 
-    // Save campaign data (now ~5KB instead of ~335KB)
+    const dataSize = JSON.stringify(stored).length;
+    console.log(`[Storage] Data size: ${(dataSize / 1024).toFixed(1)} KB`);
+
     localStorage.setItem(`campaign_${campaign.id}`, JSON.stringify(stored));
-
-    // Update current campaign ID
     localStorage.setItem(CURRENT_CAMPAIGN_KEY, campaign.id);
-
-    console.log(`[Storage] Saved campaign ${campaign.id} at quest ${progress.currentQuestIndex} (images excluded)`);
+    console.log(`[Storage] Saved campaign ${campaign.id} at quest ${progress.currentQuestIndex}`);
   } catch (error) {
     console.error('[Storage] Failed to save campaign:', error);
   }
 }
 
 /**
- * Load a campaign from localStorage
+ * Load a campaign from storage (metadata from localStorage, images from IndexedDB)
  */
-export function loadCampaign(campaignId: string): StoredCampaign | null {
+export async function loadCampaign(campaignId: string): Promise<StoredCampaign | null> {
+  // Load metadata from localStorage
+  const stored = loadFromLocalStorage(campaignId);
+  if (!stored) {
+    return null;
+  }
+
+  // Load images from IndexedDB
+  if (isIndexedDBAvailable()) {
+    try {
+      const questIds = stored.campaign.quests.map(q => q.id);
+      const images = await loadCampaignImages(campaignId, questIds);
+
+      // Attach images to quests
+      for (const quest of stored.campaign.quests) {
+        if (images[quest.id]) {
+          quest.imageUrl = images[quest.id];
+        }
+      }
+
+      const imagesLoaded = Object.keys(images).length;
+      console.log(`[Storage] Loaded campaign ${campaignId} with ${imagesLoaded}/${questIds.length} images from IndexedDB`);
+    } catch (error) {
+      console.warn('[Storage] Failed to load images from IndexedDB:', error);
+    }
+  }
+
+  return stored;
+}
+
+/**
+ * Load campaign metadata from localStorage
+ */
+function loadFromLocalStorage(campaignId: string): StoredCampaign | null {
   try {
     const data = localStorage.getItem(`campaign_${campaignId}`);
-    if (!data) return null;
+    if (!data) {
+      console.log(`[Storage] No campaign found with id ${campaignId}`);
+      return null;
+    }
+
+    console.log(`[Storage] Loading campaign from localStorage, data size: ${(data.length / 1024).toFixed(1)} KB`);
 
     const stored: StoredCampaign = JSON.parse(data);
 
@@ -81,7 +152,6 @@ export function loadCampaign(campaignId: string): StoredCampaign | null {
       );
     }
 
-    console.log(`[Storage] Loaded campaign ${campaignId}`);
     return stored;
   } catch (error) {
     console.error('[Storage] Failed to load campaign:', error);
@@ -92,14 +162,14 @@ export function loadCampaign(campaignId: string): StoredCampaign | null {
 /**
  * Get the current active campaign ID
  */
-export function getCurrentCampaignId(): string | null {
+export async function getCurrentCampaignId(): Promise<string | null> {
   return localStorage.getItem(CURRENT_CAMPAIGN_KEY);
 }
 
 /**
  * Clear the current campaign (user finished or abandoned)
  */
-export function clearCurrentCampaign(): void {
+export async function clearCurrentCampaign(): Promise<void> {
   localStorage.removeItem(CURRENT_CAMPAIGN_KEY);
   console.log('[Storage] Cleared current campaign');
 }
@@ -107,15 +177,14 @@ export function clearCurrentCampaign(): void {
 /**
  * Mark a campaign as completed
  */
-export function markCampaignComplete(campaignId: string): void {
+export async function markCampaignComplete(campaignId: string): Promise<void> {
   try {
-    const stored = loadCampaign(campaignId);
-    if (!stored) return;
-
-    stored.completedAt = new Date();
-    localStorage.setItem(`campaign_${campaignId}`, JSON.stringify(stored));
-
-    console.log(`[Storage] Marked campaign ${campaignId} as complete`);
+    const stored = loadFromLocalStorage(campaignId);
+    if (stored) {
+      stored.completedAt = new Date();
+      localStorage.setItem(`campaign_${campaignId}`, JSON.stringify(stored));
+      console.log(`[Storage] Marked campaign ${campaignId} as complete`);
+    }
   } catch (error) {
     console.error('[Storage] Failed to mark campaign complete:', error);
   }
@@ -150,7 +219,7 @@ export function addToHistory(campaignId: string): void {
 /**
  * Get campaign history (array of StoredCampaign objects)
  */
-export function getCampaignHistory(): StoredCampaign[] {
+export async function getCampaignHistory(): Promise<StoredCampaign[]> {
   try {
     const historyData = localStorage.getItem(CAMPAIGN_HISTORY_KEY);
     if (!historyData) return [];
@@ -159,7 +228,7 @@ export function getCampaignHistory(): StoredCampaign[] {
     const campaigns: StoredCampaign[] = [];
 
     for (const campaignId of history) {
-      const campaign = loadCampaign(campaignId);
+      const campaign = loadFromLocalStorage(campaignId);
       if (campaign) {
         campaigns.push(campaign);
       }
@@ -175,7 +244,17 @@ export function getCampaignHistory(): StoredCampaign[] {
 /**
  * Delete a campaign from storage
  */
-export function deleteCampaign(campaignId: string): void {
+export async function deleteCampaign(campaignId: string): Promise<void> {
+  // Delete images from IndexedDB
+  if (isIndexedDBAvailable()) {
+    try {
+      await deleteImagesForCampaign(campaignId);
+    } catch (error) {
+      console.warn('[Storage] Failed to delete images from IndexedDB:', error);
+    }
+  }
+
+  // Delete from localStorage
   try {
     localStorage.removeItem(`campaign_${campaignId}`);
     localStorage.removeItem(`journey_${campaignId}`);

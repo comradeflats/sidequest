@@ -1,5 +1,6 @@
 import { GoogleGenerativeAI, HarmCategory, HarmBlockThreshold } from "@google/generative-ai";
 import { Quest } from "../types";
+import { costEstimator } from "./cost-estimator";
 
 const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(API_KEY);
@@ -73,6 +74,9 @@ export async function generateQuestImage(quest: Quest): Promise<string | null> {
       The image must be entirely visual - NO letters, numbers, signs, or text of any kind.
       Focus on creating a beautiful, atmospheric pixel art scene.
     `;
+
+    // Track Image Generation Cost
+    costEstimator.trackGeminiImageGen();
 
     const result = await model.generateContent(prompt);
     const response = await result.response;
