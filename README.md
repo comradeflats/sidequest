@@ -10,6 +10,15 @@ SideQuest is an immersive AR-style scavenger hunt application that combines real
 
 ## 🆕 Latest Updates
 
+### January 16, 2026 - IndexedDB Image Caching
+
+**✅ Major Cost Optimization:**
+- ✅ Quest images now persist in IndexedDB (~50MB+ storage vs localStorage's 5MB)
+- ✅ No more image regeneration on session resume - saves $0.12-$0.20 per resume
+- ✅ Images load instantly from local cache
+- ✅ Graceful fallback to regeneration if cache unavailable
+- 📋 **Impact:** Eliminates redundant Gemini API calls, significant cost savings
+
 ### January 13, 2026 - Ready for Hackathon Submission
 
 **✅ Production Ready - English Version:**
@@ -17,9 +26,6 @@ SideQuest is an immersive AR-style scavenger hunt application that combines real
 - ✅ App running smoothly on localhost
 - ✅ All core features functional
 - ✅ Video generation removed (reverted to image-only for stability)
-- 📋 **Status:** Ready for hackathon demo and submission
-
-**Note:** Multilingual infrastructure exists but UI migration shelved for post-hackathon.
 
 ### January 12, 2026 - Phase 1.5 Complete
 
@@ -415,7 +421,7 @@ Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_fr
 - [ ] Location-based push notifications
 
 ### Technical Improvements
-- [ ] Image caching (localStorage/IndexedDB)
+- [x] Image caching (IndexedDB) - ✅ Implemented Jan 16, 2026
 - [ ] Progressive image loading
 - [ ] Optimize bundle size
 - [ ] Add unit tests (Jest + React Testing Library)

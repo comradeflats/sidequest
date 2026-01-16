@@ -1,8 +1,8 @@
 # 📊 SideQuest - Project Status
 
-**Last Updated:** January 11, 2026
-**Version:** 0.1.0 (Gemini 3 Gameathon Submission)
-**Status:** ✅ **FULLY FUNCTIONAL**
+**Last Updated:** January 16, 2026
+**Version:** 1.1.0 (Gemini 3 Gameathon Submission)
+**Status:** ✅ **FULLY FUNCTIONAL** with IndexedDB Image Caching
 
 ---
 
@@ -244,12 +244,11 @@ All TypeScript, ESLint, and Tailwind dependencies working correctly.
 - **Documentation:** Added to README troubleshooting section
 - **Priority:** Informational only
 
-### Issue 3: No Image Caching 📝
-- **Status:** Feature not implemented
-- **Impact:** Images regenerated if page refreshes
-- **Performance:** Acceptable for hackathon demo
-- **Solution:** Add localStorage or IndexedDB caching
-- **Priority:** Future enhancement
+### Issue 3: No Image Caching ✅ RESOLVED
+- **Status:** ✅ Implemented (January 16, 2026)
+- **Solution:** IndexedDB storage for quest images (~50MB+ capacity)
+- **Impact:** Images persist across sessions, no regeneration on resume
+- **Cost Savings:** Eliminates $0.12-$0.20 per session resume
 
 ---
 
@@ -481,6 +480,11 @@ All TypeScript, ESLint, and Tailwind dependencies working correctly.
 
 ---
 
-**Last Code Change:** January 11, 2026, 10:45 PM UTC
+**Last Code Change:** January 16, 2026
 **Project Lead:** @comradeflats
 **Built For:** Gemini 3 Gameathon 2026
+
+### Recent Changes (Jan 16, 2026)
+- Added `lib/indexeddb-storage.ts` for image persistence
+- Updated `lib/storage.ts` to use IndexedDB for images, localStorage for metadata
+- Images now load from cache on resume instead of regenerating

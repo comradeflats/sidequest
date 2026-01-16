@@ -1,8 +1,8 @@
 # 🏆 SideQuest - Hackathon Submission Status
 
-**Date:** January 13, 2026
+**Date:** January 16, 2026
 **Status:** ✅ READY FOR SUBMISSION
-**Version:** 1.0 (English-only, stable)
+**Version:** 1.1 (English-only, stable, with image caching)
 
 ---
 
@@ -25,7 +25,8 @@
 - ✅ **TypeScript:** Full type safety
 - ✅ **Responsive Design:** Works on mobile and desktop
 - ✅ **Real-time GPS:** Battery-efficient tracking
-- ✅ **Local Storage:** Campaign persistence
+- ✅ **IndexedDB Image Caching:** Quest images persist across sessions (no regeneration costs)
+- ✅ **Local Storage:** Campaign metadata persistence
 - ✅ **PWA Ready:** Installable on mobile devices
 
 ### Gemini 3 Integration
@@ -252,6 +253,11 @@ NEXT_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
 
 ---
 
-**Last Updated:** January 13, 2026
-**Version:** 1.0 - English Edition
+**Last Updated:** January 16, 2026
+**Version:** 1.1 - English Edition with Image Caching
 **Status:** Ready to ship! 🚀
+
+### Recent Updates (Jan 16, 2026)
+- ✅ **IndexedDB Image Caching:** Quest images now persist in IndexedDB (~50MB+ limit)
+- ✅ **Cost Savings:** No more $0.12-$0.20 image regeneration costs on resume
+- ✅ **Instant Resume:** Images load from cache instead of regenerating
