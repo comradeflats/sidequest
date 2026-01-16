@@ -1,11 +1,12 @@
 /**
- * IndexedDB storage for quest images
+ * IndexedDB storage for quest media (images, videos, audio)
  * Provides much larger storage than localStorage (~50MB+ vs 5MB)
  */
 
 const DB_NAME = 'sidequest-db';
-const DB_VERSION = 1;
+const DB_VERSION = 2;  // Bumped for schema changes
 const IMAGES_STORE = 'quest-images';
+const MEDIA_STORE = 'quest-media';  // New store for video/audio submissions
 
 let dbInstance: IDBDatabase | null = null;
 
@@ -41,6 +42,14 @@ export function openDatabase(): Promise<IDBDatabase> {
         const store = db.createObjectStore(IMAGES_STORE, { keyPath: ['campaignId', 'questId'] });
         store.createIndex('campaignId', 'campaignId', { unique: false });
         console.log('[IndexedDB] Created quest-images store');
+      }
+
+      // Create media store for video/audio submissions
+      if (!db.objectStoreNames.contains(MEDIA_STORE)) {
+        const mediaStore = db.createObjectStore(MEDIA_STORE, { keyPath: ['campaignId', 'questId'] });
+        mediaStore.createIndex('campaignId', 'campaignId', { unique: false });
+        mediaStore.createIndex('mediaType', 'mediaType', { unique: false });
+        console.log('[IndexedDB] Created quest-media store');
       }
     };
   });
@@ -195,4 +204,149 @@ export async function deleteImagesForCampaign(campaignId: string): Promise<void>
  */
 export function isIndexedDBAvailable(): boolean {
   return typeof indexedDB !== 'undefined';
+}
+
+// ============================================
+// Video/Audio Media Storage Functions
+// ============================================
+
+export type StoredMediaType = 'video' | 'audio';
+
+interface StoredMedia {
+  campaignId: string;
+  questId: string;
+  mediaType: StoredMediaType;
+  mediaData: string;  // base64 data URL
+  mimeType: string;
+  duration: number;
+  savedAt: string;
+}
+
+/**
+ * Save video/audio media to IndexedDB
+ */
+export async function saveMediaToIndexedDB(
+  campaignId: string,
+  questId: string,
+  mediaType: StoredMediaType,
+  base64Data: string,
+  mimeType: string,
+  duration: number
+): Promise<void> {
+  try {
+    const db = await openDatabase();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(MEDIA_STORE, 'readwrite');
+      const store = transaction.objectStore(MEDIA_STORE);
+
+      const mediaRecord: StoredMedia = {
+        campaignId,
+        questId,
+        mediaType,
+        mediaData: base64Data,
+        mimeType,
+        duration,
+        savedAt: new Date().toISOString(),
+      };
+
+      const request = store.put(mediaRecord);
+
+      request.onsuccess = () => {
+        console.log(`[IndexedDB] Saved ${mediaType} for quest ${questId}`);
+        resolve();
+      };
+
+      request.onerror = () => {
+        console.error(`[IndexedDB] Failed to save ${mediaType} for quest ${questId}:`, request.error);
+        reject(request.error);
+      };
+    });
+  } catch (error) {
+    console.error('[IndexedDB] saveMediaToIndexedDB error:', error);
+  }
+}
+
+/**
+ * Get video/audio media from IndexedDB
+ */
+export async function getMediaFromIndexedDB(
+  campaignId: string,
+  questId: string
+): Promise<StoredMedia | null> {
+  try {
+    const db = await openDatabase();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(MEDIA_STORE, 'readonly');
+      const store = transaction.objectStore(MEDIA_STORE);
+
+      const request = store.get([campaignId, questId]);
+
+      request.onsuccess = () => {
+        if (request.result) {
+          resolve(request.result as StoredMedia);
+        } else {
+          resolve(null);
+        }
+      };
+
+      request.onerror = () => {
+        console.error(`[IndexedDB] Failed to get media for quest ${questId}:`, request.error);
+        reject(request.error);
+      };
+    });
+  } catch (error) {
+    console.error('[IndexedDB] getMediaFromIndexedDB error:', error);
+    return null;
+  }
+}
+
+/**
+ * Delete all media for a campaign from IndexedDB
+ */
+export async function deleteMediaForCampaign(campaignId: string): Promise<void> {
+  try {
+    const db = await openDatabase();
+
+    return new Promise((resolve, reject) => {
+      const transaction = db.transaction(MEDIA_STORE, 'readwrite');
+      const store = transaction.objectStore(MEDIA_STORE);
+      const index = store.index('campaignId');
+
+      const request = index.openCursor(IDBKeyRange.only(campaignId));
+
+      request.onsuccess = (event) => {
+        const cursor = (event.target as IDBRequest<IDBCursorWithValue>).result;
+        if (cursor) {
+          cursor.delete();
+          cursor.continue();
+        } else {
+          console.log(`[IndexedDB] Deleted all media for campaign ${campaignId}`);
+          resolve();
+        }
+      };
+
+      request.onerror = () => {
+        console.error(`[IndexedDB] Failed to delete media for campaign ${campaignId}:`, request.error);
+        reject(request.error);
+      };
+    });
+  } catch (error) {
+    console.error('[IndexedDB] deleteMediaForCampaign error:', error);
+  }
+}
+
+/**
+ * Get estimated storage size for a media file
+ * Video: ~5-15MB for 720p 30sec
+ * Audio: ~0.5-1MB for 60sec WebM
+ */
+export function estimateMediaSize(base64Data: string): { bytes: number; megabytes: number } {
+  // Base64 is ~33% larger than binary
+  const bytes = Math.ceil((base64Data.length * 3) / 4);
+  return {
+    bytes,
+    megabytes: Math.round((bytes / (1024 * 1024)) * 100) / 100
+  };
 }

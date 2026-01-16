@@ -10,7 +10,14 @@ import {
 const CURRENT_CAMPAIGN_KEY = 'current_campaign_id';
 const CAMPAIGN_HISTORY_KEY = 'campaign_history';
 const PLAYER_PROGRESS_KEY = 'player_progress';
+const QUEST_PREFERENCES_KEY = 'quest_preferences';
 const MAX_HISTORY_SIZE = 10;
+
+// Quest type preferences
+export interface QuestTypePreferences {
+  enableVideoQuests: boolean;
+  enableAudioQuests: boolean;
+}
 
 /**
  * Save a campaign to storage (IndexedDB for images, localStorage for metadata)
@@ -394,4 +401,53 @@ export function getXPForNextLevel(currentXP: number): { current: number; needed:
     needed: xpNeededForLevel,
     progress: Math.min(progress, 100)
   };
+}
+
+// ============================================
+// Quest Type Preferences
+// ============================================
+
+/**
+ * Get quest type preferences from storage
+ */
+export function getQuestTypePreferences(): QuestTypePreferences {
+  try {
+    const data = localStorage.getItem(QUEST_PREFERENCES_KEY);
+    if (data) {
+      return JSON.parse(data);
+    }
+  } catch (error) {
+    console.error('[Storage] Failed to load quest type preferences:', error);
+  }
+
+  // Default: video and audio disabled
+  return {
+    enableVideoQuests: false,
+    enableAudioQuests: false
+  };
+}
+
+/**
+ * Save quest type preferences to storage
+ */
+export function saveQuestTypePreferences(preferences: QuestTypePreferences): void {
+  try {
+    localStorage.setItem(QUEST_PREFERENCES_KEY, JSON.stringify(preferences));
+    console.log('[Storage] Saved quest type preferences:', preferences);
+  } catch (error) {
+    console.error('[Storage] Failed to save quest type preferences:', error);
+  }
+}
+
+/**
+ * Update a single quest type preference
+ */
+export function updateQuestTypePreference(
+  key: keyof QuestTypePreferences,
+  value: boolean
+): QuestTypePreferences {
+  const current = getQuestTypePreferences();
+  const updated = { ...current, [key]: value };
+  saveQuestTypePreferences(updated);
+  return updated;
 }

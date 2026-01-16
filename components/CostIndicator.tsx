@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { costEstimator } from '@/lib/cost-estimator';
-import { Code, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
+import { Wrench, X, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function CostIndicator() {
@@ -18,62 +18,56 @@ export default function CostIndicator() {
     return unsubscribe;
   }, []);
 
-  if (cost === 0 && !isExpanded) {
-    // Optional: Hide if 0, or show minimal
-    // return null; 
-  }
-
   return (
-    <div className="fixed bottom-4 left-4 z-50 font-mono text-xs">
+    <div className="fixed bottom-4 right-4 z-50 font-mono text-xs">
       <AnimatePresence>
         {isExpanded && (
           <motion.div
-            initial={{ opacity: 0, y: 10, height: 0 }}
-            animate={{ opacity: 1, y: 0, height: 'auto' }}
-            exit={{ opacity: 0, y: 10, height: 0 }}
-            className="bg-black/80 backdrop-blur-md border border-purple-500/30 rounded-t-lg p-3 w-48 text-white mb-[-1px]"
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="absolute bottom-12 right-0 bg-black/90 backdrop-blur-md border border-zinc-700 rounded-lg p-3 w-44 text-white shadow-xl"
           >
             <div className="space-y-2">
-              <div className="text-[10px] text-orange-400 font-bold uppercase tracking-wider mb-2">
-                API Costs (Dev Only)
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[10px] text-zinc-400 uppercase tracking-wider">Dev Costs</span>
+                <button
+                  onClick={() => setIsExpanded(false)}
+                  className="text-zinc-500 hover:text-white"
+                >
+                  <X size={12} />
+                </button>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">Gemini AI:</span>
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-zinc-500">Gemini:</span>
                 <span className="text-emerald-400">${breakdown.gemini.toFixed(4)}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-gray-400">Maps API:</span>
+              <div className="flex justify-between items-center text-[11px]">
+                <span className="text-zinc-500">Maps:</span>
                 <span className="text-blue-400">${breakdown.maps.toFixed(4)}</span>
               </div>
-              <div className="pt-2 border-t border-purple-500/20 flex justify-between">
-                 <button
-                   onClick={() => costEstimator.reset()}
-                   className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-1"
-                 >
-                   <RotateCcw size={10} /> Reset
-                 </button>
+              <div className="flex justify-between items-center text-[11px] pt-1 border-t border-zinc-800">
+                <span className="text-zinc-400">Total:</span>
+                <span className="text-white font-medium">${cost.toFixed(4)}</span>
               </div>
+              <button
+                onClick={() => costEstimator.reset()}
+                className="w-full mt-2 text-[10px] text-zinc-500 hover:text-zinc-300 flex items-center justify-center gap-1 py-1 border border-zinc-800 rounded hover:border-zinc-600 transition-colors"
+              >
+                <RotateCcw size={10} /> Reset
+              </button>
             </div>
           </motion.div>
         )}
       </AnimatePresence>
 
-      <motion.button
+      <button
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`flex items-center gap-2 px-3 py-2 bg-black/90 backdrop-blur-md border border-purple-500/30 text-white shadow-lg transition-all ${isExpanded ? 'rounded-b-lg rounded-t-none' : 'rounded-full hover:bg-black/70'}`}
-        title="API costs (dev only)"
-        whileHover={{ scale: 1.02 }}
-        whileTap={{ scale: 0.98 }}
+        className="p-2 bg-zinc-900/80 backdrop-blur-sm border border-zinc-800 rounded-full text-zinc-500 hover:text-zinc-300 hover:border-zinc-600 transition-colors shadow-lg"
+        title="Dev tools"
       >
-        <div className="p-1 bg-purple-500/20 rounded-full">
-          <Code size={14} className="text-purple-400" />
-        </div>
-        <div className="flex flex-col items-start leading-none">
-          <span className="text-[10px] text-orange-400 uppercase tracking-wider font-bold">DEV</span>
-          <span className="font-bold text-purple-400">${cost.toFixed(4)}</span>
-        </div>
-        {isExpanded ? <ChevronDown size={14} className="text-gray-500" /> : <ChevronUp size={14} className="text-gray-500" />}
-      </motion.button>
+        <Wrench size={14} />
+      </button>
     </div>
   );
 }

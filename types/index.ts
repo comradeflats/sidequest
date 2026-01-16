@@ -87,6 +87,10 @@ export interface Quest {
   imageUrl?: string;                // Base64 data URL for generated image
   imageGenerationFailed?: boolean;  // Fallback flag if generation fails
 
+  // Quest type for media capture
+  questType?: QuestType;            // 'PHOTO' | 'VIDEO' | 'AUDIO' (defaults to 'PHOTO')
+  mediaRequirements?: MediaRequirements;  // Duration constraints for video/audio
+
   // Location data
   coordinates?: Coordinates;
   distanceFromPrevious?: number;  // km from previous quest (or start)
@@ -107,15 +111,37 @@ export interface Campaign {
   startCoordinates?: Coordinates;
   totalDistance?: number;         // Total campaign distance in km
   estimatedTotalTime?: number;    // Total time estimate in minutes (walking)
+
+  // Quest type settings
+  enableVideoQuests?: boolean;    // Whether video quests were enabled at creation
+  enableAudioQuests?: boolean;    // Whether audio quests were enabled at creation
 }
 
-// Media types for verification (photo only)
-export type MediaType = 'photo';
+// Campaign generation options
+export interface CampaignOptions {
+  enableVideoQuests?: boolean;
+  enableAudioQuests?: boolean;
+}
+
+// Media types for verification
+export type MediaType = 'photo' | 'video' | 'audio';
+
+// Quest types for different capture modes
+export type QuestType = 'PHOTO' | 'VIDEO' | 'AUDIO';
+
+// Media requirements for video/audio quests
+export interface MediaRequirements {
+  minDuration?: number;  // seconds
+  maxDuration?: number;  // seconds
+  description?: string;  // e.g., "10-30 second video"
+}
 
 // Media capture data
 export interface MediaCaptureData {
   type: MediaType;
   data: string; // base64 data URL
+  duration?: number;  // seconds (for video/audio)
+  mimeType?: string;  // e.g., 'video/webm', 'audio/webm'
 }
 
 export interface VerificationResult {

@@ -21,13 +21,21 @@ export class CostEstimator {
     MAPS_PLACES_NEARBY: 0.017, // ~$17 per 1000 requests
     MAPS_GEOCODE: 0.005,      // ~$5 per 1000 requests
     MAPS_DISTANCE: 0.005,     // ~$5 per 1000 elements
-    
+
     // Gemini API (1.5 Flash - Text/Multimodal)
     GEMINI_FLASH_INPUT_1M: 0.075,
     GEMINI_FLASH_OUTPUT_1M: 0.30,
-    
+
     // Gemini API (Image Generation - Imagen 3 / Pro Image)
     GEMINI_IMAGE_GEN: 0.040,   // ~$0.04 per image
+
+    // Gemini API (Video Input - ~300 tokens/second)
+    // Cost per 1000 video tokens (similar to text input pricing)
+    GEMINI_VIDEO_INPUT_1K: 0.000075,  // ~$0.075 per 1M tokens
+
+    // Gemini API (Audio Input - ~32 tokens/second)
+    // Cost per 1000 audio tokens (similar to text input pricing)
+    GEMINI_AUDIO_INPUT_1K: 0.000075,  // ~$0.075 per 1M tokens
   };
 
   constructor() {
@@ -127,6 +135,30 @@ export class CostEstimator {
 
   public trackGeminiImageGen(count: number = 1) {
     const cost = count * this.PRICING.GEMINI_IMAGE_GEN;
+    this.geminiCost += cost;
+    this.totalCost += cost;
+    this.notify();
+    this.save();
+  }
+
+  /**
+   * Track video input cost
+   * @param tokenCount - Number of video tokens (~300 tokens/second of video)
+   */
+  public trackGeminiVideoInput(tokenCount: number) {
+    const cost = (tokenCount / 1000) * this.PRICING.GEMINI_VIDEO_INPUT_1K;
+    this.geminiCost += cost;
+    this.totalCost += cost;
+    this.notify();
+    this.save();
+  }
+
+  /**
+   * Track audio input cost
+   * @param tokenCount - Number of audio tokens (~32 tokens/second of audio)
+   */
+  public trackGeminiAudioInput(tokenCount: number) {
+    const cost = (tokenCount / 1000) * this.PRICING.GEMINI_AUDIO_INPUT_1K;
     this.geminiCost += cost;
     this.totalCost += cost;
     this.notify();

@@ -1,11 +1,14 @@
 // Type-safe analytics event tracking for Google Analytics 4
 
+// Media types for analytics tracking
+type AnalyticsMediaType = 'photo' | 'video' | 'audio';
+
 export type AnalyticsEvent =
   | { name: 'campaign_created'; params: { location: string; type: 'short' | 'long'; distance_range: string; quest_count: number } }
-  | { name: 'verification_attempt'; params: { quest_id: string; quest_index: number; media_type: 'photo' } }
-  | { name: 'verification_success'; params: { quest_id: string; quest_index: number; media_type: 'photo' } }
-  | { name: 'verification_failure'; params: { quest_id: string; quest_index: number; appealable: boolean; media_type: 'photo' } }
-  | { name: 'appeal_submitted'; params: { quest_id: string; gps_distance: number | null } }
+  | { name: 'verification_attempt'; params: { quest_id: string; quest_index: number; media_type: AnalyticsMediaType } }
+  | { name: 'verification_success'; params: { quest_id: string; quest_index: number; media_type: AnalyticsMediaType } }
+  | { name: 'verification_failure'; params: { quest_id: string; quest_index: number; appealable: boolean; media_type: AnalyticsMediaType } }
+  | { name: 'appeal_submitted'; params: { quest_id: string; gps_distance: number | null; media_type?: AnalyticsMediaType } }
   | { name: 'appeal_success'; params: { quest_id: string } }
   | { name: 'quest_completed'; params: { quest_id: string; quest_index: number; total_quests: number } }
   | { name: 'campaign_completed'; params: { campaign_id: string; total_distance: number; duration_minutes: number; quest_count: number } }
