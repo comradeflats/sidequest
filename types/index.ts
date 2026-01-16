@@ -170,3 +170,31 @@ export interface StoredCampaign {
   };
   journeyStats?: JourneyStats;
 }
+
+// Player progress for XP system
+export interface PlayerProgress {
+  totalXP: number;
+  level: number;
+  questsCompleted: number;
+}
+
+// XP rewards by difficulty
+export const XP_REWARDS: Record<Difficulty, number> = {
+  easy: 50,
+  medium: 100,
+  hard: 150
+};
+
+// Level thresholds (XP needed for each level)
+export const LEVEL_THRESHOLDS = [
+  0,      // Level 1
+  100,    // Level 2
+  250,    // Level 3
+  500,    // Level 4
+  1000,   // Level 5
+  2000,   // Level 6
+  4000,   // Level 7
+  8000,   // Level 8
+  16000,  // Level 9
+  32000   // Level 10
+];

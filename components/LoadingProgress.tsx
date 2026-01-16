@@ -12,7 +12,12 @@ const DEFAULT_ROTATING_MESSAGES = [
   "CHARTING YOUR COURSE...",
   "CONSULTING ANCIENT MAPS...",
   "FINDING LEGENDARY LOCATIONS...",
-  "PREPARING YOUR JOURNEY..."
+  "PREPARING YOUR JOURNEY...",
+  "AWAKENING ANCIENT SPIRITS...",
+  "DECODING MYSTERIOUS RUNES...",
+  "SUMMONING LOCAL LEGENDS...",
+  "WEAVING YOUR DESTINY...",
+  "UNLOCKING SECRET PATHS..."
 ];
 
 interface LoadingProgressProps {
@@ -45,11 +50,11 @@ export default function LoadingProgress({
 
     const messageInterval = setInterval(() => {
       setCurrentMessageIndex((prev) => (prev + 1) % messages.length);
-    }, 2500);
+    }, 4000);
 
     const iconInterval = setInterval(() => {
       setIconIndex((prev) => (prev + 1) % LOGO_ICONS.length);
-    }, 1500);
+    }, 2500);
 
     return () => {
       clearInterval(messageInterval);

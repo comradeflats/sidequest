@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { costEstimator } from '@/lib/cost-estimator';
-import { Coins, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
+import { Code, ChevronUp, ChevronDown, RotateCcw } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function CostIndicator() {
@@ -31,9 +31,12 @@ export default function CostIndicator() {
             initial={{ opacity: 0, y: 10, height: 0 }}
             animate={{ opacity: 1, y: 0, height: 'auto' }}
             exit={{ opacity: 0, y: 10, height: 0 }}
-            className="bg-black/80 backdrop-blur-md border border-white/20 rounded-t-lg p-3 w-48 text-white mb-[-1px]"
+            className="bg-black/80 backdrop-blur-md border border-purple-500/30 rounded-t-lg p-3 w-48 text-white mb-[-1px]"
           >
             <div className="space-y-2">
+              <div className="text-[10px] text-orange-400 font-bold uppercase tracking-wider mb-2">
+                API Costs (Dev Only)
+              </div>
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Gemini AI:</span>
                 <span className="text-emerald-400">${breakdown.gemini.toFixed(4)}</span>
@@ -42,8 +45,8 @@ export default function CostIndicator() {
                 <span className="text-gray-400">Maps API:</span>
                 <span className="text-blue-400">${breakdown.maps.toFixed(4)}</span>
               </div>
-              <div className="pt-2 border-t border-white/10 flex justify-between">
-                 <button 
+              <div className="pt-2 border-t border-purple-500/20 flex justify-between">
+                 <button
                    onClick={() => costEstimator.reset()}
                    className="text-[10px] text-red-400 hover:text-red-300 flex items-center gap-1"
                  >
@@ -57,16 +60,17 @@ export default function CostIndicator() {
 
       <motion.button
         onClick={() => setIsExpanded(!isExpanded)}
-        className={`flex items-center gap-2 px-3 py-2 bg-black/90 backdrop-blur-md border border-white/20 text-white shadow-lg transition-all ${isExpanded ? 'rounded-b-lg rounded-t-none' : 'rounded-full hover:bg-black/70'}`}
+        className={`flex items-center gap-2 px-3 py-2 bg-black/90 backdrop-blur-md border border-purple-500/30 text-white shadow-lg transition-all ${isExpanded ? 'rounded-b-lg rounded-t-none' : 'rounded-full hover:bg-black/70'}`}
+        title="API costs (dev only)"
         whileHover={{ scale: 1.02 }}
         whileTap={{ scale: 0.98 }}
       >
-        <div className="p-1 bg-yellow-500/20 rounded-full">
-          <Coins size={14} className="text-yellow-500" />
+        <div className="p-1 bg-purple-500/20 rounded-full">
+          <Code size={14} className="text-purple-400" />
         </div>
         <div className="flex flex-col items-start leading-none">
-          <span className="text-[10px] text-gray-400 uppercase tracking-wider">Est. Cost</span>
-          <span className="font-bold text-yellow-500">${cost.toFixed(4)}</span>
+          <span className="text-[10px] text-orange-400 uppercase tracking-wider font-bold">DEV</span>
+          <span className="font-bold text-purple-400">${cost.toFixed(4)}</span>
         </div>
         {isExpanded ? <ChevronDown size={14} className="text-gray-500" /> : <ChevronUp size={14} className="text-gray-500" />}
       </motion.button>

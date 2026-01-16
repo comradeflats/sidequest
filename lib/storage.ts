@@ -1,4 +1,4 @@
-import { Campaign, VerificationResult, JourneyStats, StoredCampaign } from '../types';
+import { Campaign, VerificationResult, JourneyStats, StoredCampaign, PlayerProgress, LEVEL_THRESHOLDS } from '../types';
 import {
   saveCampaignImages,
   loadCampaignImages,
@@ -9,6 +9,7 @@ import {
 // Storage keys
 const CURRENT_CAMPAIGN_KEY = 'current_campaign_id';
 const CAMPAIGN_HISTORY_KEY = 'campaign_history';
+const PLAYER_PROGRESS_KEY = 'player_progress';
 const MAX_HISTORY_SIZE = 10;
 
 /**
@@ -310,4 +311,87 @@ export function clearAllData(): void {
   } catch (error) {
     console.error('[Storage] Failed to clear all data:', error);
   }
+}
+
+/**
+ * Calculate level from total XP
+ */
+export function calculateLevel(xp: number): number {
+  let level = 1;
+  for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (xp >= LEVEL_THRESHOLDS[i]) {
+      level = i + 1;
+      break;
+    }
+  }
+  return Math.min(level, LEVEL_THRESHOLDS.length);
+}
+
+/**
+ * Get player progress from storage
+ */
+export function getPlayerProgress(): PlayerProgress {
+  try {
+    const data = localStorage.getItem(PLAYER_PROGRESS_KEY);
+    if (data) {
+      const progress: PlayerProgress = JSON.parse(data);
+      // Recalculate level in case thresholds changed
+      progress.level = calculateLevel(progress.totalXP);
+      return progress;
+    }
+  } catch (error) {
+    console.error('[Storage] Failed to load player progress:', error);
+  }
+
+  // Default progress
+  return {
+    totalXP: 0,
+    level: 1,
+    questsCompleted: 0
+  };
+}
+
+/**
+ * Add XP to player progress
+ */
+export function addXP(amount: number): PlayerProgress {
+  const current = getPlayerProgress();
+  const previousLevel = current.level;
+
+  current.totalXP += amount;
+  current.questsCompleted += 1;
+  current.level = calculateLevel(current.totalXP);
+
+  try {
+    localStorage.setItem(PLAYER_PROGRESS_KEY, JSON.stringify(current));
+    console.log(`[Storage] Added ${amount} XP. Total: ${current.totalXP}, Level: ${current.level}`);
+
+    // Check for level up
+    if (current.level > previousLevel) {
+      console.log(`[Storage] LEVEL UP! ${previousLevel} -> ${current.level}`);
+    }
+  } catch (error) {
+    console.error('[Storage] Failed to save player progress:', error);
+  }
+
+  return current;
+}
+
+/**
+ * Get XP needed for next level
+ */
+export function getXPForNextLevel(currentXP: number): { current: number; needed: number; progress: number } {
+  const level = calculateLevel(currentXP);
+  const currentThreshold = LEVEL_THRESHOLDS[level - 1] || 0;
+  const nextThreshold = LEVEL_THRESHOLDS[level] || LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1];
+
+  const xpInCurrentLevel = currentXP - currentThreshold;
+  const xpNeededForLevel = nextThreshold - currentThreshold;
+  const progress = xpNeededForLevel > 0 ? (xpInCurrentLevel / xpNeededForLevel) * 100 : 100;
+
+  return {
+    current: xpInCurrentLevel,
+    needed: xpNeededForLevel,
+    progress: Math.min(progress, 100)
+  };
 }

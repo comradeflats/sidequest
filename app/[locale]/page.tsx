@@ -6,7 +6,7 @@ import { MapPin, Compass, Zap, Map, CheckCircle, XCircle, Camera, Navigation, Me
 import { generateCampaign, verifyPhoto, verifyPhotoWithAppeal } from '@/lib/game-logic';
 import { geocodeLocation } from '@/lib/location';
 import { generateQuestImage } from '@/lib/gemini';
-import { Campaign, VerificationResult, DistanceRange, LocationData, Coordinates, AppealData, MediaCaptureData } from '@/types';
+import { Campaign, VerificationResult, DistanceRange, LocationData, Coordinates, AppealData, MediaCaptureData, XP_REWARDS } from '@/types';
 import { trackEvent } from '@/lib/analytics';
 import Scanner from '@/components/Scanner';
 import DistanceRangeSelector from '@/components/DistanceRangeSelector';
@@ -18,6 +18,7 @@ import JourneyStatsCard from '@/components/JourneyStatsCard';
 import QuestBook from '@/components/QuestBook';
 import LoadingProgress from '@/components/LoadingProgress';
 import QuestPreview from '@/components/QuestPreview';
+import XPHeader from '@/components/XPHeader';
 import {
   getCurrentCampaignId,
   loadCampaign,
@@ -25,7 +26,8 @@ import {
   clearCurrentCampaign,
   markCampaignComplete,
   addToHistory,
-  getCampaignHistory
+  getCampaignHistory,
+  addXP
 } from '@/lib/storage';
 
 export default function Home() {
@@ -64,6 +66,9 @@ export default function Home() {
   // Quest Book State
   const [showQuestBook, setShowQuestBook] = useState(false);
   const [campaignHistory, setCampaignHistory] = useState<any[]>([]);
+
+  // XP State
+  const [xpGain, setXpGain] = useState<{ amount: number; timestamp: number } | null>(null);
 
   // Ref for auto-scrolling to loading area
   const loadingRef = useRef<HTMLDivElement>(null);
@@ -158,7 +163,7 @@ export default function Home() {
     if (isLoading && loadingRef.current) {
       // Small delay to ensure the loading component is rendered
       setTimeout(() => {
-        loadingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        loadingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     }
   }, [isLoading]);
@@ -435,6 +440,11 @@ export default function Home() {
     const currentQuest = campaign.quests[campaign.currentQuestIndex];
     setCompletedQuests(prev => [...prev, currentQuest.id]);
 
+    // Award XP based on quest difficulty
+    const xpAmount = XP_REWARDS[currentQuest.difficulty] || XP_REWARDS.medium;
+    addXP(xpAmount);
+    setXpGain({ amount: xpAmount, timestamp: Date.now() });
+
     // Track quest completion
     trackEvent({
       name: 'quest_completed',
@@ -509,6 +519,9 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black text-emerald-400 p-6 selection:bg-emerald-900 selection:text-emerald-100">
+      {/* XP Header - Fixed Position */}
+      <XPHeader onXPGain={xpGain} />
+
       {/* Quest Book Button - Fixed Position */}
       {campaign && (
         <button
