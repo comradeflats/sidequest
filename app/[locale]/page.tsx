@@ -2,13 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Compass, Zap, Map, CheckCircle, XCircle, Camera, Navigation, MessageSquare, ExternalLink, RefreshCw, Crosshair } from 'lucide-react';
-import { generateCampaign, verifyPhoto, verifyPhotoWithAppeal } from '@/lib/game-logic';
+import { MapPin, Compass, Zap, Map, CheckCircle, XCircle, Camera, Video, Mic, Navigation, MessageSquare, ExternalLink, RefreshCw, Crosshair, Info } from 'lucide-react';
+import { generateCampaign, verifyMedia, verifyMediaWithAppeal } from '@/lib/game-logic';
 import { geocodeLocation } from '@/lib/location';
 import { generateQuestImage } from '@/lib/gemini';
-import { Campaign, VerificationResult, DistanceRange, LocationData, Coordinates, AppealData, MediaCaptureData, XP_REWARDS } from '@/types';
+import { Campaign, VerificationResult, DistanceRange, LocationData, Coordinates, AppealData, MediaCaptureData, XP_REWARDS, QuestType, CampaignOptions } from '@/types';
 import { trackEvent } from '@/lib/analytics';
-import Scanner from '@/components/Scanner';
+import MediaScanner from '@/components/MediaScanner';
 import DistanceRangeSelector from '@/components/DistanceRangeSelector';
 import { useGeolocation } from '@/hooks/useGeolocation';
 import { useJourneyTracking } from '@/hooks/useJourneyTracking';
@@ -27,7 +27,10 @@ import {
   markCampaignComplete,
   addToHistory,
   getCampaignHistory,
-  addXP
+  addXP,
+  getQuestTypePreferences,
+  saveQuestTypePreferences,
+  QuestTypePreferences
 } from '@/lib/storage';
 
 export default function Home() {
@@ -51,8 +54,14 @@ export default function Home() {
   const [gpsAccuracy, setGpsAccuracy] = useState<number | null>(null);
   const [gpsEnabled, setGpsEnabled] = useState(false);
   const [showAppealDialog, setShowAppealDialog] = useState(false);
-  const [lastVerificationImage, setLastVerificationImage] = useState<string | null>(null);
+  const [lastCaptureData, setLastCaptureData] = useState<MediaCaptureData | null>(null);
   const [isAppealing, setIsAppealing] = useState(false);
+
+  // Quest Type Preferences State
+  const [questTypePrefs, setQuestTypePrefs] = useState<QuestTypePreferences>({
+    enableVideoQuests: false,
+    enableAudioQuests: false
+  });
 
   // Journey Tracking State
   const [showJourneyMap, setShowJourneyMap] = useState(false);
@@ -167,6 +176,12 @@ export default function Home() {
       }, 100);
     }
   }, [isLoading]);
+
+  // Load quest type preferences on mount
+  useEffect(() => {
+    const prefs = getQuestTypePreferences();
+    setQuestTypePrefs(prefs);
+  }, []);
 
   const handleGeocodeLocation = async () => {
     if (!location.trim()) return;
@@ -290,9 +305,15 @@ export default function Home() {
 
     setIsLoading(true);
     try {
+      // Build campaign options with quest type preferences
+      const campaignOptions: CampaignOptions = {
+        enableVideoQuests: questTypePrefs.enableVideoQuests,
+        enableAudioQuests: questTypePrefs.enableAudioQuests
+      };
+
       // Use geocodedLocation.name to pass to generateCampaign (which will geocode again)
       // The function will re-geocode, but we've already confirmed the location is valid
-      const newCampaign = await generateCampaign(geocodedLocation.name, type, distanceRange);
+      const newCampaign = await generateCampaign(geocodedLocation.name, type, distanceRange, campaignOptions);
       setCampaign(newCampaign);
 
       // Track campaign creation
@@ -317,11 +338,12 @@ export default function Home() {
   const handleCapture = async (captureData: MediaCaptureData) => {
     setIsScanning(false);
     setIsVerifying(true);
-    setLastVerificationImage(captureData.data); // Store for potential appeal
+    setLastCaptureData(captureData); // Store for potential appeal
 
     if (!campaign) return;
 
     const currentQuest = campaign.quests[campaign.currentQuestIndex];
+    const mediaType = captureData.type;
 
     try {
       // Track verification attempt
@@ -330,15 +352,16 @@ export default function Home() {
         params: {
           quest_id: currentQuest.id,
           quest_index: campaign.currentQuestIndex,
-          media_type: 'photo'
+          media_type: mediaType
         }
       });
 
-      // Verify the photo
-      const verification = await verifyPhoto(
-        captureData.data,
+      // Verify the media using unified verifyMedia function
+      const verification = await verifyMedia(
+        captureData,
         currentQuest.objective,
         currentQuest.secretCriteria,
+        currentQuest.mediaRequirements,
         userGps || undefined,
         currentQuest.coordinates
       );
@@ -352,7 +375,7 @@ export default function Home() {
           params: {
             quest_id: currentQuest.id,
             quest_index: campaign.currentQuestIndex,
-            media_type: 'photo'
+            media_type: mediaType
           }
         });
       } else {
@@ -362,7 +385,7 @@ export default function Home() {
             quest_id: currentQuest.id,
             quest_index: campaign.currentQuestIndex,
             appealable: verification.appealable || false,
-            media_type: 'photo'
+            media_type: mediaType
           }
         });
       }
@@ -374,7 +397,7 @@ export default function Home() {
   };
 
   const handleAppealSubmit = async (explanation: string) => {
-    if (!campaign || !lastVerificationImage) return;
+    if (!campaign || !lastCaptureData) return;
 
     setIsAppealing(true);
     const currentQuest = campaign.quests[campaign.currentQuestIndex];
@@ -392,16 +415,18 @@ export default function Home() {
         name: 'appeal_submitted',
         params: {
           quest_id: currentQuest.id,
-          gps_distance: appealData.distanceFromTarget
+          gps_distance: appealData.distanceFromTarget,
+          media_type: lastCaptureData.type
         }
       });
 
-      const appealResult = await verifyPhotoWithAppeal(
-        lastVerificationImage,
+      const appealResult = await verifyMediaWithAppeal(
+        lastCaptureData,
         currentQuest.objective,
         currentQuest.secretCriteria,
         appealData,
-        currentQuest.coordinates!
+        currentQuest.coordinates!,
+        currentQuest.mediaRequirements
       );
 
       // Convert AppealResult to VerificationResult
@@ -519,8 +544,8 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black text-emerald-400 p-6 selection:bg-emerald-900 selection:text-emerald-100">
-      {/* XP Header - Fixed Position */}
-      <XPHeader onXPGain={xpGain} />
+      {/* XP Header - Fixed Position - Only show when questing */}
+      {campaign && <XPHeader onXPGain={xpGain} />}
 
       {/* Quest Book Button - Fixed Position */}
       {campaign && (
@@ -584,8 +609,10 @@ export default function Home() {
         )}
 
         <AnimatePresence mode="wait">
-          {isScanning && (
-            <Scanner
+          {isScanning && campaign && (
+            <MediaScanner
+              questType={campaign.quests[campaign.currentQuestIndex].questType || 'PHOTO'}
+              mediaRequirements={campaign.quests[campaign.currentQuestIndex].mediaRequirements}
               onCapture={handleCapture}
               onCancel={() => setIsScanning(false)}
             />
@@ -684,6 +711,74 @@ export default function Home() {
                 onSelect={setDistanceRange}
               />
 
+              {/* Quest Type Settings */}
+              <div className="space-y-3">
+                <label className="block text-xs font-pixel text-adventure-gold flex items-center gap-2">
+                  QUEST_TYPES
+                  <span className="text-gray-500 font-sans font-normal">(experimental)</span>
+                </label>
+                <div className="bg-zinc-900 border-2 border-zinc-800 rounded-lg p-4 space-y-3">
+                  {/* Video Quests Toggle */}
+                  <label className="flex items-center justify-between cursor-pointer group">
+                    <div className="flex items-center gap-3">
+                      <Video className={`w-5 h-5 ${questTypePrefs.enableVideoQuests ? 'text-red-500' : 'text-gray-500'}`} />
+                      <div>
+                        <span className="text-sm font-sans text-white">Video Quests</span>
+                        <p className="text-xs text-gray-500">Record motion at fountains, streets, etc.</p>
+                      </div>
+                    </div>
+                    <div
+                      onClick={() => {
+                        const newPrefs = { ...questTypePrefs, enableVideoQuests: !questTypePrefs.enableVideoQuests };
+                        setQuestTypePrefs(newPrefs);
+                        saveQuestTypePreferences(newPrefs);
+                      }}
+                      className={`relative w-12 h-6 rounded-full transition-colors ${
+                        questTypePrefs.enableVideoQuests ? 'bg-red-500' : 'bg-zinc-700'
+                      }`}
+                    >
+                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                        questTypePrefs.enableVideoQuests ? 'translate-x-7' : 'translate-x-1'
+                      }`} />
+                    </div>
+                  </label>
+
+                  {/* Audio Quests Toggle */}
+                  <label className="flex items-center justify-between cursor-pointer group">
+                    <div className="flex items-center gap-3">
+                      <Mic className={`w-5 h-5 ${questTypePrefs.enableAudioQuests ? 'text-purple-500' : 'text-gray-500'}`} />
+                      <div>
+                        <span className="text-sm font-sans text-white">Audio Quests</span>
+                        <p className="text-xs text-gray-500">Record sounds at markets, stations, etc.</p>
+                      </div>
+                    </div>
+                    <div
+                      onClick={() => {
+                        const newPrefs = { ...questTypePrefs, enableAudioQuests: !questTypePrefs.enableAudioQuests };
+                        setQuestTypePrefs(newPrefs);
+                        saveQuestTypePreferences(newPrefs);
+                      }}
+                      className={`relative w-12 h-6 rounded-full transition-colors ${
+                        questTypePrefs.enableAudioQuests ? 'bg-purple-500' : 'bg-zinc-700'
+                      }`}
+                    >
+                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                        questTypePrefs.enableAudioQuests ? 'translate-x-7' : 'translate-x-1'
+                      }`} />
+                    </div>
+                  </label>
+
+                  {(questTypePrefs.enableVideoQuests || questTypePrefs.enableAudioQuests) && (
+                    <div className="flex items-start gap-2 mt-2 pt-2 border-t border-zinc-800">
+                      <Info className="w-4 h-4 text-adventure-sky flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-gray-400">
+                        Gemini will create a mix of quest types based on what fits each location.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Campaign Type Selection */}
               <div className="space-y-3">
                 <label className="block text-xs font-pixel text-adventure-gold">
@@ -737,7 +832,7 @@ export default function Home() {
               {!result ? (
                 <LoadingProgress
                   message="ANALYZING..."
-                  subMessage="Gemini is verifying your photo"
+                  subMessage={`Gemini is verifying your ${lastCaptureData?.type || 'submission'}`}
                 />
               ) : (
                 <div className="space-y-6">
@@ -785,7 +880,9 @@ export default function Home() {
                         className="w-full border-2 border-red-500 text-red-400 font-bold font-pixel py-4 px-6 rounded-lg hover:bg-red-500/10 transition-colors"
                         style={{ fontSize: '0.85rem' }}
                       >
-                        TAKE NEW PHOTO
+                        {lastCaptureData?.type === 'video' ? 'RECORD NEW VIDEO' :
+                         lastCaptureData?.type === 'audio' ? 'RECORD NEW AUDIO' :
+                         'TAKE NEW PHOTO'}
                       </button>
                     </div>
                   )}
@@ -815,10 +912,21 @@ export default function Home() {
                           className="w-full h-full object-cover image-rendering-pixelated"
                         />
                         {/* Quest Number Badge */}
-                        <div className="absolute top-4 right-4 bg-black/80 border-2 border-adventure-gold px-3 py-1 rounded z-10">
-                          <span className="font-pixel text-adventure-gold text-xs">
-                            {questNumber}/{totalQuests}
-                          </span>
+                        <div className="absolute top-4 right-4 flex gap-2 z-10">
+                          {/* Quest Type Badge */}
+                          {currentQuest.questType && currentQuest.questType !== 'PHOTO' && (
+                            <div className={`bg-black/80 border-2 px-2 py-1 rounded flex items-center gap-1 ${
+                              currentQuest.questType === 'VIDEO' ? 'border-red-500 text-red-400' : 'border-purple-500 text-purple-400'
+                            }`}>
+                              {currentQuest.questType === 'VIDEO' ? <Video className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                              <span className="font-pixel text-xs">{currentQuest.questType}</span>
+                            </div>
+                          )}
+                          <div className="bg-black/80 border-2 border-adventure-gold px-3 py-1 rounded">
+                            <span className="font-pixel text-adventure-gold text-xs">
+                              {questNumber}/{totalQuests}
+                            </span>
+                          </div>
                         </div>
                         {/* Gradient Overlay */}
                         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/50 pointer-events-none" />
@@ -840,15 +948,12 @@ export default function Home() {
                         {currentQuest.narrative}
                       </p>
 
-                      {/* Distance & Duration Info */}
-                      {currentQuest.distanceFromPrevious && currentQuest.estimatedDuration && (
+                      {/* Distance Info */}
+                      {currentQuest.distanceFromPrevious && (
                         <div className="flex items-center gap-4 pl-9 text-xs font-sans">
                           <div className="flex items-center gap-1.5 text-adventure-sky">
                             <Navigation className="w-4 h-4" />
                             <span>{currentQuest.distanceFromPrevious.toFixed(1)}km away</span>
-                          </div>
-                          <div className="text-gray-500">
-                            ~{currentQuest.estimatedDuration} min
                           </div>
                         </div>
                       )}
@@ -950,14 +1055,34 @@ export default function Home() {
                           </button>
                         )}
 
-                        {/* Scan Button */}
+                        {/* Scan/Record Button */}
                         <button
-                          className="w-full bg-adventure-emerald text-black font-bold font-pixel py-4 px-6 rounded-lg hover:bg-adventure-gold transition-colors flex items-center justify-center gap-2 shadow-pixel-lg"
+                          className={`w-full font-bold font-pixel py-4 px-6 rounded-lg transition-colors flex items-center justify-center gap-2 shadow-pixel-lg ${
+                            currentQuest.questType === 'VIDEO'
+                              ? 'bg-red-500 text-white hover:bg-red-400'
+                              : currentQuest.questType === 'AUDIO'
+                              ? 'bg-purple-500 text-white hover:bg-purple-400'
+                              : 'bg-adventure-emerald text-black hover:bg-adventure-gold'
+                          }`}
                           onClick={() => setIsScanning(true)}
                           style={{ fontSize: '0.85rem' }}
                         >
-                          <Camera className="w-5 h-5" />
-                          SCAN LOCATION
+                          {currentQuest.questType === 'VIDEO' ? (
+                            <>
+                              <Video className="w-5 h-5" />
+                              RECORD VIDEO
+                            </>
+                          ) : currentQuest.questType === 'AUDIO' ? (
+                            <>
+                              <Mic className="w-5 h-5" />
+                              RECORD AUDIO
+                            </>
+                          ) : (
+                            <>
+                              <Camera className="w-5 h-5" />
+                              SCAN LOCATION
+                            </>
+                          )}
                         </button>
                       </div>
                     </div>
@@ -989,9 +1114,9 @@ export default function Home() {
                     )}
 
                     {/* Campaign Progress */}
-                    {campaign.totalDistance && campaign.estimatedTotalTime && (
+                    {campaign.totalDistance && (
                       <div className="text-center text-xs font-sans text-gray-600 space-y-1">
-                        <p>Total Campaign: {campaign.totalDistance.toFixed(1)}km • ~{campaign.estimatedTotalTime} min walking</p>
+                        <p>Total Campaign: {campaign.totalDistance.toFixed(1)}km</p>
                       </div>
                     )}
                   </>
