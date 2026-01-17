@@ -201,6 +201,10 @@ export default function MediaScanner({
   // Stop recording
   const stopRecording = useCallback(() => {
     if (mediaRecorderRef.current && isRecording) {
+      // Calculate and store final duration BEFORE state change clears the ref
+      if (recordingStartTimeRef.current && finalDurationRef.current === 0) {
+        finalDurationRef.current = Math.floor((performance.now() - recordingStartTimeRef.current) / 1000);
+      }
       mediaRecorderRef.current.stop();
       setIsRecording(false);
     }
