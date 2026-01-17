@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Compass, Zap, Map, CheckCircle, XCircle, Camera, Video, Mic, Navigation, MessageSquare, ExternalLink, RefreshCw, Crosshair, Info } from 'lucide-react';
+import { MapPin, Compass, Zap, Map, CheckCircle, XCircle, Camera, Video, Mic, Navigation, MessageSquare, ExternalLink, RefreshCw, Crosshair, Info, ListChecks } from 'lucide-react';
 import { generateCampaign, verifyMedia, verifyMediaWithAppeal } from '@/lib/game-logic';
 import { geocodeLocation } from '@/lib/location';
 import { generateQuestImage } from '@/lib/gemini';
@@ -60,7 +60,8 @@ export default function Home() {
   // Quest Type Preferences State
   const [questTypePrefs, setQuestTypePrefs] = useState<QuestTypePreferences>({
     enableVideoQuests: false,
-    enableAudioQuests: false
+    enableAudioQuests: false,
+    guaranteedMix: false
   });
 
   // Journey Tracking State
@@ -308,7 +309,8 @@ export default function Home() {
       // Build campaign options with quest type preferences
       const campaignOptions: CampaignOptions = {
         enableVideoQuests: questTypePrefs.enableVideoQuests,
-        enableAudioQuests: questTypePrefs.enableAudioQuests
+        enableAudioQuests: questTypePrefs.enableAudioQuests,
+        guaranteedMix: questTypePrefs.guaranteedMix
       };
 
       // Use geocodedLocation.name to pass to generateCampaign (which will geocode again)
@@ -718,63 +720,108 @@ export default function Home() {
                   <span className="text-gray-500 font-sans font-normal">(experimental)</span>
                 </label>
                 <div className="bg-zinc-900 border-2 border-zinc-800 rounded-lg p-4 space-y-3">
-                  {/* Video Quests Toggle */}
+                  {/* Guaranteed Mix Toggle */}
                   <label className="flex items-center justify-between cursor-pointer group">
                     <div className="flex items-center gap-3">
-                      <Video className={`w-5 h-5 ${questTypePrefs.enableVideoQuests ? 'text-red-500' : 'text-gray-500'}`} />
+                      <ListChecks className={`w-5 h-5 ${questTypePrefs.guaranteedMix ? 'text-adventure-gold' : 'text-gray-500'}`} />
                       <div>
-                        <span className="text-sm font-sans text-white">Video Quests</span>
-                        <p className="text-xs text-gray-500">Record motion at fountains, streets, etc.</p>
+                        <span className="text-sm font-sans text-white">Guaranteed Mix</span>
+                        <p className="text-xs text-gray-500">Exactly 1 photo, 1 video, and 1 audio quest</p>
                       </div>
                     </div>
                     <div
                       onClick={() => {
-                        const newPrefs = { ...questTypePrefs, enableVideoQuests: !questTypePrefs.enableVideoQuests };
+                        const newGuaranteedMix = !questTypePrefs.guaranteedMix;
+                        const newPrefs = {
+                          ...questTypePrefs,
+                          guaranteedMix: newGuaranteedMix,
+                          // When enabling guaranteed mix, also enable video and audio
+                          enableVideoQuests: newGuaranteedMix ? true : questTypePrefs.enableVideoQuests,
+                          enableAudioQuests: newGuaranteedMix ? true : questTypePrefs.enableAudioQuests
+                        };
                         setQuestTypePrefs(newPrefs);
                         saveQuestTypePreferences(newPrefs);
                       }}
                       className={`relative w-12 h-6 rounded-full transition-colors ${
-                        questTypePrefs.enableVideoQuests ? 'bg-red-500' : 'bg-zinc-700'
+                        questTypePrefs.guaranteedMix ? 'bg-adventure-gold' : 'bg-zinc-700'
                       }`}
                     >
                       <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                        questTypePrefs.enableVideoQuests ? 'translate-x-7' : 'translate-x-1'
+                        questTypePrefs.guaranteedMix ? 'translate-x-7' : 'translate-x-1'
                       }`} />
                     </div>
                   </label>
 
-                  {/* Audio Quests Toggle */}
-                  <label className="flex items-center justify-between cursor-pointer group">
-                    <div className="flex items-center gap-3">
-                      <Mic className={`w-5 h-5 ${questTypePrefs.enableAudioQuests ? 'text-purple-500' : 'text-gray-500'}`} />
-                      <div>
-                        <span className="text-sm font-sans text-white">Audio Quests</span>
-                        <p className="text-xs text-gray-500">Record sounds at markets, stations, etc.</p>
-                      </div>
-                    </div>
-                    <div
-                      onClick={() => {
-                        const newPrefs = { ...questTypePrefs, enableAudioQuests: !questTypePrefs.enableAudioQuests };
-                        setQuestTypePrefs(newPrefs);
-                        saveQuestTypePreferences(newPrefs);
-                      }}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${
-                        questTypePrefs.enableAudioQuests ? 'bg-purple-500' : 'bg-zinc-700'
-                      }`}
-                    >
-                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                        questTypePrefs.enableAudioQuests ? 'translate-x-7' : 'translate-x-1'
-                      }`} />
-                    </div>
-                  </label>
-
-                  {(questTypePrefs.enableVideoQuests || questTypePrefs.enableAudioQuests) && (
-                    <div className="flex items-start gap-2 mt-2 pt-2 border-t border-zinc-800">
-                      <Info className="w-4 h-4 text-adventure-sky flex-shrink-0 mt-0.5" />
-                      <p className="text-xs text-gray-400">
-                        Gemini will create a mix of quest types based on what fits each location.
+                  {questTypePrefs.guaranteedMix && (
+                    <div className="flex items-start gap-2 py-2 px-3 bg-adventure-gold/10 border border-adventure-gold/30 rounded">
+                      <Info className="w-4 h-4 text-adventure-gold flex-shrink-0 mt-0.5" />
+                      <p className="text-xs text-adventure-gold">
+                        Quick Hunt will include all 3 media types for a complete experience.
                       </p>
                     </div>
+                  )}
+
+                  {!questTypePrefs.guaranteedMix && (
+                    <>
+                      {/* Video Quests Toggle */}
+                      <label className="flex items-center justify-between cursor-pointer group">
+                        <div className="flex items-center gap-3">
+                          <Video className={`w-5 h-5 ${questTypePrefs.enableVideoQuests ? 'text-red-500' : 'text-gray-500'}`} />
+                          <div>
+                            <span className="text-sm font-sans text-white">Video Quests</span>
+                            <p className="text-xs text-gray-500">Record motion at fountains, streets, etc.</p>
+                          </div>
+                        </div>
+                        <div
+                          onClick={() => {
+                            const newPrefs = { ...questTypePrefs, enableVideoQuests: !questTypePrefs.enableVideoQuests };
+                            setQuestTypePrefs(newPrefs);
+                            saveQuestTypePreferences(newPrefs);
+                          }}
+                          className={`relative w-12 h-6 rounded-full transition-colors ${
+                            questTypePrefs.enableVideoQuests ? 'bg-red-500' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                            questTypePrefs.enableVideoQuests ? 'translate-x-7' : 'translate-x-1'
+                          }`} />
+                        </div>
+                      </label>
+
+                      {/* Audio Quests Toggle */}
+                      <label className="flex items-center justify-between cursor-pointer group">
+                        <div className="flex items-center gap-3">
+                          <Mic className={`w-5 h-5 ${questTypePrefs.enableAudioQuests ? 'text-purple-500' : 'text-gray-500'}`} />
+                          <div>
+                            <span className="text-sm font-sans text-white">Audio Quests</span>
+                            <p className="text-xs text-gray-500">Record sounds at markets, stations, etc.</p>
+                          </div>
+                        </div>
+                        <div
+                          onClick={() => {
+                            const newPrefs = { ...questTypePrefs, enableAudioQuests: !questTypePrefs.enableAudioQuests };
+                            setQuestTypePrefs(newPrefs);
+                            saveQuestTypePreferences(newPrefs);
+                          }}
+                          className={`relative w-12 h-6 rounded-full transition-colors ${
+                            questTypePrefs.enableAudioQuests ? 'bg-purple-500' : 'bg-zinc-700'
+                          }`}
+                        >
+                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
+                            questTypePrefs.enableAudioQuests ? 'translate-x-7' : 'translate-x-1'
+                          }`} />
+                        </div>
+                      </label>
+
+                      {(questTypePrefs.enableVideoQuests || questTypePrefs.enableAudioQuests) && (
+                        <div className="flex items-start gap-2 mt-2 pt-2 border-t border-zinc-800">
+                          <Info className="w-4 h-4 text-adventure-sky flex-shrink-0 mt-0.5" />
+                          <p className="text-xs text-gray-400">
+                            Gemini will create a mix of quest types based on what fits each location.
+                          </p>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               </div>

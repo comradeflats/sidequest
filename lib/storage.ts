@@ -17,6 +17,7 @@ const MAX_HISTORY_SIZE = 10;
 export interface QuestTypePreferences {
   enableVideoQuests: boolean;
   enableAudioQuests: boolean;
+  guaranteedMix: boolean;
 }
 
 /**
@@ -420,10 +421,11 @@ export function getQuestTypePreferences(): QuestTypePreferences {
     console.error('[Storage] Failed to load quest type preferences:', error);
   }
 
-  // Default: video and audio disabled
+  // Default: video, audio, and guaranteed mix disabled
   return {
     enableVideoQuests: false,
-    enableAudioQuests: false
+    enableAudioQuests: false,
+    guaranteedMix: false
   };
 }
 

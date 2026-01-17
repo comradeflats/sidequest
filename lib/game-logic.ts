@@ -7,7 +7,25 @@ import { Campaign, Quest, DistanceRange, DISTANCE_RANGES, PlaceData, Coordinates
 /**
  * Build quest type instructions for campaign generation prompt
  */
-function buildQuestTypeInstructions(enableVideo: boolean, enableAudio: boolean): string {
+function buildQuestTypeInstructions(enableVideo: boolean, enableAudio: boolean, guaranteedMix: boolean = false): string {
+  // Guaranteed Mix mode: exactly 1 photo, 1 video, 1 audio quest
+  if (guaranteedMix) {
+    return `
+    GUARANTEED MIX MODE - STRICT REQUIREMENT:
+    You MUST create exactly:
+    - 1 PHOTO quest (questType: "PHOTO", mediaRequirements: null)
+    - 1 VIDEO quest (questType: "VIDEO", mediaRequirements: { minDuration: 5, maxDuration: 30, description: "5-30 second video" })
+    - 1 AUDIO quest (questType: "AUDIO", mediaRequirements: { minDuration: 10, maxDuration: 60, description: "10-60 second recording" })
+
+    Assign quest types strategically based on which location best fits each type:
+    - PHOTO: Best for landmarks, signs, statues, building facades, specific visual details
+    - VIDEO: Best for fountains, waterfalls, street performers, busy intersections, moving sculptures
+    - AUDIO: Best for markets, train stations, busy streets, nature areas, unique soundscapes
+
+    The order of quests should follow the natural route, not be grouped by type.
+    `;
+  }
+
   if (!enableVideo && !enableAudio) {
     return `
     QUEST TYPES:
@@ -69,6 +87,7 @@ export async function generateCampaign(
 ): Promise<Campaign> {
   const enableVideoQuests = options?.enableVideoQuests || false;
   const enableAudioQuests = options?.enableAudioQuests || false;
+  const guaranteedMix = options?.guaranteedMix || false;
   const questCount = type === 'short' ? 3 : 5;
 
   // STEP 1: Geocode the starting location
@@ -131,7 +150,7 @@ export async function generateCampaign(
   }).join('\n\n');
 
   // Build quest type instructions based on enabled options
-  const questTypeInstructions = buildQuestTypeInstructions(enableVideoQuests, enableAudioQuests);
+  const questTypeInstructions = buildQuestTypeInstructions(enableVideoQuests, enableAudioQuests, guaranteedMix);
 
   const prompt = `
     You are an expert travel guide and game designer.
@@ -235,6 +254,7 @@ export async function generateCampaign(
       estimatedTotalTime: totalTime,
       enableVideoQuests,
       enableAudioQuests,
+      guaranteedMix,
     };
   } catch (error) {
     console.error('[SideQuest] Failed to parse campaign JSON:', text);
