@@ -59,7 +59,7 @@ export default function XPHeader({ onXPGain }: XPHeaderProps) {
   const isMaxLevel = progress.level >= LEVEL_THRESHOLDS.length;
 
   return (
-    <div className="fixed top-4 left-4 z-40">
+    <div className="relative mb-4">
       {/* Level Up Animation */}
       <AnimatePresence>
         {showLevelUp && (

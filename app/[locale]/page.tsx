@@ -546,9 +546,6 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black text-emerald-400 p-6 selection:bg-emerald-900 selection:text-emerald-100">
-      {/* XP Header - Fixed Position - Only show when questing */}
-      {campaign && <XPHeader onXPGain={xpGain} />}
-
       {/* Quest Book Button - Fixed Position */}
       {campaign && (
         <button
@@ -950,6 +947,9 @@ export default function Home() {
 
                 return (
                   <>
+                    {/* XP Header - Embedded in quest flow */}
+                    <XPHeader onXPGain={xpGain} />
+
                     {/* Quest Image - Hero Position */}
                     {currentQuest.imageUrl && !currentQuest.imageGenerationFailed && (
                       <div className="relative -mx-6 mb-6 quest-image-hero overflow-hidden">

@@ -30,6 +30,8 @@ export default function MediaScanner({
   const audioContextRef = useRef<AudioContext | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
   const animationFrameRef = useRef<number | null>(null);
+  const recordingStartTimeRef = useRef<number | null>(null);
+  const finalDurationRef = useRef<number>(0);
 
   const minDuration = mediaRequirements?.minDuration || (questType === 'VIDEO' ? 5 : 10);
   const maxDuration = mediaRequirements?.maxDuration || (questType === 'VIDEO' ? 30 : 60);
@@ -46,23 +48,33 @@ export default function MediaScanner({
     };
   }, []);
 
-  // Recording timer
+  // Recording timer - uses precise elapsed time instead of interval counter
   useEffect(() => {
     let interval: NodeJS.Timeout | null = null;
 
     if (isRecording) {
+      // Set start time when recording begins
+      if (!recordingStartTimeRef.current) {
+        recordingStartTimeRef.current = performance.now();
+      }
+
+      // Update display every 100ms for accurate UI
       interval = setInterval(() => {
-        setRecordingDuration(prev => {
-          const newDuration = prev + 1;
+        if (recordingStartTimeRef.current) {
+          const elapsedSeconds = Math.floor((performance.now() - recordingStartTimeRef.current) / 1000);
+          setRecordingDuration(elapsedSeconds);
+
           // Auto-stop at max duration
-          if (newDuration >= maxDuration) {
+          if (elapsedSeconds >= maxDuration) {
+            // Store final duration before stopping
+            finalDurationRef.current = elapsedSeconds;
             stopRecording();
           }
-          return newDuration;
-        });
-      }, 1000);
+        }
+      }, 100);
     } else {
       setRecordingDuration(0);
+      recordingStartTimeRef.current = null;
     }
 
     return () => {
@@ -141,6 +153,16 @@ export default function MediaScanner({
       };
 
       mediaRecorder.onstop = () => {
+        // Calculate precise final duration using the start time ref
+        let preciseDuration = 0;
+        if (recordingStartTimeRef.current) {
+          preciseDuration = Math.floor((performance.now() - recordingStartTimeRef.current) / 1000);
+        }
+        // Use finalDurationRef if set (from auto-stop), otherwise use calculated duration
+        const finalDuration = finalDurationRef.current > 0 ? finalDurationRef.current : preciseDuration;
+        // Reset for next recording
+        finalDurationRef.current = 0;
+
         // Stop all tracks
         stream.getTracks().forEach(track => track.stop());
 
@@ -161,7 +183,7 @@ export default function MediaScanner({
           onCapture({
             type: questType === 'VIDEO' ? 'video' : 'audio',
             data: base64Data,
-            duration: recordingDuration,
+            duration: finalDuration,
             mimeType: mimeType.split(';')[0] // Remove codecs part
           });
         };
@@ -174,7 +196,7 @@ export default function MediaScanner({
       console.error('Failed to start recording:', error);
       alert('Could not access camera/microphone. Please check permissions.');
     }
-  }, [questType, facingMode, onCapture, recordingDuration]);
+  }, [questType, facingMode, onCapture]);
 
   // Stop recording
   const stopRecording = useCallback(() => {
