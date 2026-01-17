@@ -9,6 +9,13 @@
 import { Coordinates, LocationData, DistanceData } from '@/types';
 import { costEstimator } from './cost-estimator';
 
+// Distance Matrix API element response type
+interface DistanceMatrixElement {
+  status: string;
+  distance?: { value: number; text: string };
+  duration?: { value: number; text: string };
+}
+
 // We still check if the key is present in env to fail fast, but the actual key usage is on the server.
 const GOOGLE_MAPS_API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY || '';
 
@@ -184,8 +191,8 @@ export async function calculateDistances(
       return destinations.map((dest) => calculateStraightLineDistance(origin, dest));
     }
 
-    return data.rows[0].elements.map((element: any, index: number) => {
-      if (element.status !== 'OK') {
+    return data.rows[0].elements.map((element: DistanceMatrixElement, index: number) => {
+      if (element.status !== 'OK' || !element.distance || !element.duration) {
         return calculateStraightLineDistance(origin, destinations[index]);
       }
 

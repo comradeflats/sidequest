@@ -5,9 +5,15 @@ import { costEstimator } from "./cost-estimator";
 const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(API_KEY);
 
+// Model config type
+interface ModelConfig {
+  safetySettings: Array<{ category: HarmCategory; threshold: HarmBlockThreshold }>;
+  generationConfig?: { responseMimeType: string };
+}
+
 export const getModel = (type: 'campaign' | 'verification' | 'image' = 'verification') => {
   let modelName: string;
-  let config: any = {
+  const config: ModelConfig = {
     safetySettings: [
       { category: HarmCategory.HARM_CATEGORY_HARASSMENT, threshold: HarmBlockThreshold.BLOCK_NONE },
       { category: HarmCategory.HARM_CATEGORY_HATE_SPEECH, threshold: HarmBlockThreshold.BLOCK_NONE },

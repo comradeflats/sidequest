@@ -34,6 +34,8 @@ export function useJourneyTracking({
         pathPoints: [],
         questCompletionTimes: []
       };
+      // Intentionally initializing state when tracking starts
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setJourneyStats(newStats);
     }
   }, [enabled, journeyStats]);
@@ -41,6 +43,8 @@ export function useJourneyTracking({
   // Allow external initialization (for resume)
   useEffect(() => {
     if (initialStats && !journeyStats) {
+      // Intentionally restoring state from external data
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setJourneyStats(initialStats);
       // Restore last recorded point from path history
       if (initialStats.pathPoints.length > 0) {

@@ -29,7 +29,7 @@ export default function XPHeader({ onXPGain }: XPHeaderProps) {
     loadProgress();
   }, []);
 
-  // Handle XP gain animation
+  // Handle XP gain animation - responds to prop changes
   useEffect(() => {
     if (onXPGain && onXPGain.amount > 0) {
       setGainAmount(onXPGain.amount);

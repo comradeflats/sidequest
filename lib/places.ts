@@ -1,6 +1,15 @@
 import { Coordinates, PlaceData, DistanceRange, DISTANCE_RANGES } from '@/types';
 import { costEstimator } from './cost-estimator';
 
+// Google Places API response types
+interface GooglePlace {
+  displayName?: { text: string };
+  formattedAddress?: string;
+  location?: { latitude: number; longitude: number };
+  types?: string[];
+  id?: string;
+}
+
 /**
  * Find nearby places using Google Places API
  */
@@ -56,7 +65,7 @@ export async function findNearbyPlaces(
     }
 
     // Transform Google Places API response to our PlaceData format
-    const places: PlaceData[] = data.places.map((place: any) => ({
+    const places: PlaceData[] = data.places.map((place: GooglePlace) => ({
       name: place.displayName?.text || 'Unknown Place',
       formattedAddress: place.formattedAddress || '',
       coordinates: {

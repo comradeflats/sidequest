@@ -68,6 +68,8 @@ export default function MediaScanner({
     return () => {
       if (interval) clearInterval(interval);
     };
+    // stopRecording is stable and doesn't need to be in deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecording, maxDuration]);
 
   // Capture photo

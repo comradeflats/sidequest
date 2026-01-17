@@ -74,7 +74,7 @@ export default function Home() {
 
   // Quest Book State
   const [showQuestBook, setShowQuestBook] = useState(false);
-  const [campaignHistory, setCampaignHistory] = useState<any[]>([]);
+  const [campaignHistory, setCampaignHistory] = useState<Campaign[]>([]);
 
   // XP State
   const [xpGain, setXpGain] = useState<{ amount: number; timestamp: number } | null>(null);
@@ -192,7 +192,7 @@ export default function Home() {
     try {
       const locationData = await geocodeLocation(location);
       setGeocodedLocation(locationData);
-    } catch (error: any) {
+    } catch {
       setGeocodeError('Location not found. Try a full address or city name.');
       setGeocodedLocation(null);
     } finally {
@@ -326,9 +326,9 @@ export default function Home() {
           quest_count: newCampaign.quests.length
         }
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error(error);
-      const errorMessage = error.message || 'Failed to initialize adventure.';
+      const errorMessage = error instanceof Error ? error.message : 'Failed to initialize adventure.';
       alert(`Error: ${errorMessage}\n\nPlease check your API keys and try again.`);
     } finally {
       setIsLoading(false);
@@ -851,7 +851,7 @@ export default function Home() {
                       {result.success ? 'QUEST COMPLETE' : 'TRY AGAIN'}
                     </h3>
                     <p className="text-sm font-sans text-white/90 italic leading-relaxed">
-                      "{result.feedback}"
+                      &ldquo;{result.feedback}&rdquo;
                     </p>
                   </div>
 
