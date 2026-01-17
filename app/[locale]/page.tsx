@@ -6,7 +6,7 @@ import { MapPin, Compass, Zap, Map, CheckCircle, XCircle, Camera, Video, Mic, Na
 import { generateCampaign, verifyMedia, verifyMediaWithAppeal } from '@/lib/game-logic';
 import { geocodeLocation } from '@/lib/location';
 import { generateQuestImage } from '@/lib/gemini';
-import { Campaign, VerificationResult, DistanceRange, LocationData, Coordinates, AppealData, MediaCaptureData, XP_REWARDS, QuestType, CampaignOptions } from '@/types';
+import { Campaign, VerificationResult, DistanceRange, LocationData, Coordinates, AppealData, MediaCaptureData, XP_REWARDS, QuestType, CampaignOptions, StoredCampaign } from '@/types';
 import { trackEvent } from '@/lib/analytics';
 import MediaScanner from '@/components/MediaScanner';
 import DistanceRangeSelector from '@/components/DistanceRangeSelector';
@@ -74,7 +74,7 @@ export default function Home() {
 
   // Quest Book State
   const [showQuestBook, setShowQuestBook] = useState(false);
-  const [campaignHistory, setCampaignHistory] = useState<Campaign[]>([]);
+  const [campaignHistory, setCampaignHistory] = useState<StoredCampaign[]>([]);
 
   // XP State
   const [xpGain, setXpGain] = useState<{ amount: number; timestamp: number } | null>(null);

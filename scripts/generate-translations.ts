@@ -80,9 +80,11 @@ Output the complete translated JSON (raw JSON only, no markdown):`;
   console.log(`📊 Translated ${Object.keys(english).length} top-level categories`);
 
   // Count total strings
-  type TranslationValue = string | Record<string, TranslationValue>;
-  const countStrings = (obj: Record<string, TranslationValue>): number => {
-    return Object.values(obj).reduce((count: number, value: TranslationValue) => {
+  interface TranslationObject {
+    [key: string]: string | TranslationObject;
+  }
+  const countStrings = (obj: TranslationObject): number => {
+    return Object.values(obj).reduce((count: number, value: string | TranslationObject) => {
       if (typeof value === 'string') return count + 1;
       if (typeof value === 'object') return count + countStrings(value);
       return count;

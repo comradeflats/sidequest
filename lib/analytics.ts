@@ -63,7 +63,7 @@ declare global {
     gtag: (
       command: 'config' | 'event',
       targetId: string,
-      params?: Record<string, string | number | boolean | undefined>
+      params?: Record<string, string | number | boolean | null | undefined>
     ) => void;
     dataLayer?: unknown[];
   }
