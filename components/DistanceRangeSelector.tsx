@@ -1,7 +1,7 @@
 'use client';
 
 import { DistanceRange, DISTANCE_RANGES } from '@/types';
-import { Navigation, MapPin, Map, LucideIcon } from 'lucide-react';
+import { Footprints, Navigation, Map, LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
 
 interface Props {
@@ -11,8 +11,8 @@ interface Props {
 
 // Icons for each distance range
 const ICONS: Record<DistanceRange, LucideIcon> = {
-  nearby: MapPin,      // Pin for nearby locations
-  medium: Navigation,  // Navigation for medium distances
+  local: Footprints,   // Walking icon for local strolls
+  nearby: Navigation,  // Navigation for nearby walks
   far: Map,           // Map for far distances
 };
 

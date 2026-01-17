@@ -2,7 +2,7 @@
 export type Difficulty = 'easy' | 'medium' | 'hard';
 
 // Distance ranges for quests
-export type DistanceRange = 'nearby' | 'medium' | 'far';
+export type DistanceRange = 'local' | 'nearby' | 'far';
 
 // Coordinates interface
 export interface Coordinates {
@@ -47,23 +47,23 @@ export interface DistanceRangeConfig {
 
 // Distance range configurations
 export const DISTANCE_RANGES: Record<DistanceRange, DistanceRangeConfig> = {
+  local: {
+    range: 'local',
+    minDistance: 0.2,
+    maxDistance: 1,
+    avgDistance: 0.5,
+    label: 'LOCAL',
+    description: '200m-1km stroll',
+    radiusMeters: 1000
+  },
   nearby: {
     range: 'nearby',
-    minDistance: 0.5,
-    maxDistance: 3,
-    avgDistance: 1.5,
+    minDistance: 1,
+    maxDistance: 8,
+    avgDistance: 4,
     label: 'NEARBY',
-    description: '0.5-3km walks',
-    radiusMeters: 3000
-  },
-  medium: {
-    range: 'medium',
-    minDistance: 3,
-    maxDistance: 10,
-    avgDistance: 6,
-    label: 'MEDIUM',
-    description: '3-10km journey',
-    radiusMeters: 10000
+    description: '1-8km walk',
+    radiusMeters: 8000
   },
   far: {
     range: 'far',
@@ -115,12 +115,14 @@ export interface Campaign {
   // Quest type settings
   enableVideoQuests?: boolean;    // Whether video quests were enabled at creation
   enableAudioQuests?: boolean;    // Whether audio quests were enabled at creation
+  guaranteedMix?: boolean;        // Whether guaranteed mix (1 photo, 1 video, 1 audio) was enabled
 }
 
 // Campaign generation options
 export interface CampaignOptions {
   enableVideoQuests?: boolean;
   enableAudioQuests?: boolean;
+  guaranteedMix?: boolean;        // Guarantee exactly 1 photo, 1 video, 1 audio quest
 }
 
 // Media types for verification
