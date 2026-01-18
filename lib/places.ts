@@ -86,18 +86,16 @@ export async function findNearbyPlaces(
 
 /**
  * Select diverse, well-spaced quest locations from available places
+ * All places must be within maxDistance radius from startCoordinates
  */
 export function selectQuestPlaces(
   places: PlaceData[],
   count: number,
-  distanceRange: DistanceRange
+  distanceRange: DistanceRange,
+  startCoordinates: Coordinates
 ): PlaceData[] {
   if (places.length === 0) {
     return [];
-  }
-
-  if (places.length <= count) {
-    return places;
   }
 
   const config = DISTANCE_RANGES[distanceRange];
@@ -118,6 +116,24 @@ export function selectQuestPlaces(
     return R * c;
   };
 
+  // Filter places to only those within maxDistance radius from start
+  const placesWithinRadius = places.filter(place => {
+    const distanceFromStart = calculateDistance(place.coordinates, startCoordinates);
+    return distanceFromStart <= config.maxDistance;
+  });
+
+  console.log(`[SideQuest] ${placesWithinRadius.length}/${places.length} places within ${config.maxDistance}km radius`);
+
+  if (placesWithinRadius.length === 0) {
+    console.warn('[SideQuest] No places within radius, using all places');
+    // Fall back to all places if none are within radius
+    return places.slice(0, count);
+  }
+
+  if (placesWithinRadius.length <= count) {
+    return placesWithinRadius;
+  }
+
   // Helper function to check if place types are diverse
   const isDifferentType = (place: PlaceData, selectedPlaces: PlaceData[]): boolean => {
     if (selectedPlaces.length === 0) return true;
@@ -129,40 +145,47 @@ export function selectQuestPlaces(
     return !selectedTypes.includes(primaryType);
   };
 
-  // Start with a random place
-  const firstPlace = places[Math.floor(Math.random() * places.length)];
+  // Start with a random place from within radius
+  const firstPlace = placesWithinRadius[Math.floor(Math.random() * placesWithinRadius.length)];
   selected.push(firstPlace);
 
   // Select remaining places, ensuring diversity and appropriate spacing
-  while (selected.length < count && selected.length < places.length) {
+  while (selected.length < count && selected.length < placesWithinRadius.length) {
     let bestPlace: PlaceData | null = null;
     let bestScore = -Infinity;
 
-    for (const place of places) {
+    for (const place of placesWithinRadius) {
       // Skip already selected places
       if (selected.some(s => s.placeId === place.placeId)) {
         continue;
       }
 
-      // Calculate average distance from already selected places
-      const avgDistance = selected.reduce((sum, selectedPlace) => {
+      // Calculate distance from start (for radius score)
+      const distanceFromStart = calculateDistance(place.coordinates, startCoordinates);
+
+      // Calculate average distance from already selected places (for spacing)
+      const avgDistanceFromSelected = selected.reduce((sum, selectedPlace) => {
         return sum + calculateDistance(place.coordinates, selectedPlace.coordinates);
       }, 0) / selected.length;
 
-      // Score based on distance (prefer places within the target range)
-      let distanceScore = 0;
-      if (avgDistance >= config.minDistance && avgDistance <= config.maxDistance) {
-        distanceScore = 1.0; // Perfect distance
-      } else if (avgDistance < config.minDistance) {
-        distanceScore = avgDistance / config.minDistance; // Too close
+      // Score based on spacing from other quests (prefer places within the target range)
+      let spacingScore = 0;
+      if (avgDistanceFromSelected >= config.minDistance && avgDistanceFromSelected <= config.maxDistance) {
+        spacingScore = 1.0; // Perfect spacing
+      } else if (avgDistanceFromSelected < config.minDistance) {
+        spacingScore = avgDistanceFromSelected / config.minDistance; // Too close
       } else {
-        distanceScore = config.maxDistance / avgDistance; // Too far
+        spacingScore = config.maxDistance / avgDistanceFromSelected; // Too far
       }
+
+      // Score for being within radius (prefer places closer to center for easier return)
+      const radiusScore = 1 - (distanceFromStart / config.maxDistance);
 
       // Bonus for type diversity
       const diversityBonus = isDifferentType(place, selected) ? 0.3 : 0;
 
-      const totalScore = distanceScore + diversityBonus;
+      // Combined score: prioritize spacing but consider radius and diversity
+      const totalScore = (spacingScore * 0.6) + (radiusScore * 0.1) + diversityBonus;
 
       if (totalScore > bestScore) {
         bestScore = totalScore;
@@ -174,7 +197,7 @@ export function selectQuestPlaces(
       selected.push(bestPlace);
     } else {
       // If no good candidates, just pick a random unselected place
-      const unselected = places.filter(
+      const unselected = placesWithinRadius.filter(
         p => !selected.some(s => s.placeId === p.placeId)
       );
       if (unselected.length > 0) {
@@ -185,7 +208,7 @@ export function selectQuestPlaces(
     }
   }
 
-  console.log(`[SideQuest] Selected ${selected.length} diverse places for quests`);
+  console.log(`[SideQuest] Selected ${selected.length} diverse places for quests (all within ${config.maxDistance}km)`);
   return selected;
 }
 
@@ -238,7 +261,7 @@ export async function getQuestLocations(
     const places = await findNearbyPlaces(center, distanceRange);
 
     if (places && places.length >= count) {
-      const selected = selectQuestPlaces(places, count, distanceRange);
+      const selected = selectQuestPlaces(places, count, distanceRange, center);
       if (selected.length >= count) {
         console.log('[SideQuest] Using Places API for quest locations');
         return selected;

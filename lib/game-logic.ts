@@ -108,17 +108,18 @@ export async function generateCampaign(
     'placeId' in loc ? loc.coordinates : loc
   );
 
-  // STEP 3: Calculate walking distances between consecutive points
+  // STEP 3: Calculate walking distances between consecutive points (in parallel for speed)
   const startPoint = locationData.coordinates;
   const allPoints = [startPoint, ...questCoords];
-  const distances: number[] = [];
-  const durations: number[] = [];
 
-  for (let i = 0; i < questCoords.length; i++) {
-    const distanceData = await calculateDistance(allPoints[i], allPoints[i + 1]);
-    distances.push(distanceData.distanceKm);
-    durations.push(distanceData.durationMinutes);
-  }
+  // Parallel distance calculations for faster campaign generation
+  const distancePromises = questCoords.map((_, i) =>
+    calculateDistance(allPoints[i], allPoints[i + 1])
+  );
+  const distanceResults = await Promise.all(distancePromises);
+
+  const distances: number[] = distanceResults.map(r => r.distanceKm);
+  const durations: number[] = distanceResults.map(r => r.durationMinutes);
 
   const totalDistance = distances.reduce((sum, d) => sum + d, 0);
   const totalTime = durations.reduce((sum, d) => sum + d, 0);
@@ -282,22 +283,30 @@ function calculateStraightLineDistance(
 }
 
 // Helper function to calculate GPS confidence factor
-function calculateGpsConfidence(distanceMeters: number | null): number {
+// Now factors in GPS accuracy - poor accuracy increases effective distance
+function calculateGpsConfidence(distanceMeters: number | null, accuracyMeters: number = 0): number {
   if (!distanceMeters) return 0;
 
-  // Confidence scoring:
+  // If GPS accuracy is poor, we need to account for uncertainty
+  // Effective distance is the worst case: reported distance + half the accuracy radius
+  // This penalizes poor GPS readings while still giving credit for proximity
+  const effectiveDistance = accuracyMeters > 0
+    ? Math.max(distanceMeters, distanceMeters + accuracyMeters * 0.3)
+    : distanceMeters;
+
+  // Confidence scoring (using effective distance):
   // 0-15m: 1.0 (perfect)
   // 15-30m: 0.8-1.0 (very high)
   // 30-50m: 0.5-0.8 (medium)
   // 50-100m: 0.2-0.5 (low)
   // >100m: 0-0.2 (very low)
 
-  if (distanceMeters <= 15) return 1.0;
-  if (distanceMeters <= 30) return 0.8 + (0.2 * (30 - distanceMeters) / 15);
-  if (distanceMeters <= 50) return 0.5 + (0.3 * (50 - distanceMeters) / 20);
-  if (distanceMeters <= 100) return 0.2 + (0.3 * (100 - distanceMeters) / 50);
+  if (effectiveDistance <= 15) return 1.0;
+  if (effectiveDistance <= 30) return 0.8 + (0.2 * (30 - effectiveDistance) / 15);
+  if (effectiveDistance <= 50) return 0.5 + (0.3 * (50 - effectiveDistance) / 20);
+  if (effectiveDistance <= 100) return 0.2 + (0.3 * (100 - effectiveDistance) / 50);
 
-  return Math.max(0, 0.2 * (1 - (distanceMeters - 100) / 200));
+  return Math.max(0, 0.2 * (1 - (effectiveDistance - 100) / 200));
 }
 
 // Helper function to get GPS confidence label
@@ -314,20 +323,33 @@ export async function verifyPhoto(
   objective: string,
   secretCriteria: string[],
   userGps?: Coordinates,
-  targetGps?: Coordinates
+  targetGps?: Coordinates,
+  gpsAccuracy?: number
 ): Promise<VerificationResult> {
   const model = getModel('verification'); // Gemini 3 Flash is great for vision speed
 
   // Calculate distance if GPS available
   let distanceFromTarget: number | undefined;
+  let gpsConfidence: number | undefined;
   if (userGps && targetGps) {
     const distanceData = calculateStraightLineDistance(userGps, targetGps);
     distanceFromTarget = distanceData.distanceMeters;
+    gpsConfidence = calculateGpsConfidence(distanceFromTarget, gpsAccuracy);
+    console.log('[Verification] GPS boost check:', {
+      distance: `${distanceFromTarget.toFixed(0)}m`,
+      accuracy: gpsAccuracy ? `±${gpsAccuracy.toFixed(0)}m` : 'unknown',
+      confidence: gpsConfidence.toFixed(2)
+    });
   }
+
+  // Build GPS context for prompt if user is close to target
+  const gpsBoostContext = gpsConfidence && gpsConfidence >= 0.5
+    ? `\n\nGPS CONTEXT: User is ${distanceFromTarget?.toFixed(0)}m from target location. GPS confidence: ${(gpsConfidence * 100).toFixed(0)}%. If the photo appears to be at a similar location type, be more lenient.`
+    : '';
 
   const prompt = `
     Analyze this image against the objective: "${objective}".
-    Specifically look for these criteria: ${secretCriteria.join(', ')}.
+    Specifically look for these criteria: ${secretCriteria.join(', ')}.${gpsBoostContext}
 
     Respond in JSON format:
     {
@@ -452,16 +474,29 @@ export async function verifyVideo(
   secretCriteria: string[],
   mediaRequirements?: MediaRequirements,
   userGps?: Coordinates,
-  targetGps?: Coordinates
+  targetGps?: Coordinates,
+  gpsAccuracy?: number
 ): Promise<VerificationResult> {
   const model = getModel('verification');
 
   // Calculate distance if GPS available
   let distanceFromTarget: number | undefined;
+  let gpsConfidence: number | undefined;
   if (userGps && targetGps) {
     const distanceData = calculateStraightLineDistance(userGps, targetGps);
     distanceFromTarget = distanceData.distanceMeters;
+    gpsConfidence = calculateGpsConfidence(distanceFromTarget, gpsAccuracy);
+    console.log('[Verification] GPS boost check (video):', {
+      distance: `${distanceFromTarget.toFixed(0)}m`,
+      accuracy: gpsAccuracy ? `±${gpsAccuracy.toFixed(0)}m` : 'unknown',
+      confidence: gpsConfidence.toFixed(2)
+    });
   }
+
+  // Build GPS context for prompt if user is close to target
+  const gpsBoostContext = gpsConfidence && gpsConfidence >= 0.5
+    ? `\n\nGPS CONTEXT: User is ${distanceFromTarget?.toFixed(0)}m from target location. GPS confidence: ${(gpsConfidence * 100).toFixed(0)}%. If the video appears to be at a similar location type, be more lenient.`
+    : '';
 
   // Check duration requirements
   const minDuration = mediaRequirements?.minDuration || 5;
@@ -489,7 +524,7 @@ export async function verifyVideo(
 
   const prompt = `
     Analyze this video against the objective: "${objective}".
-    Specifically look for these criteria: ${secretCriteria.join(', ')}.
+    Specifically look for these criteria: ${secretCriteria.join(', ')}.${gpsBoostContext}
 
     VIDEO ANALYSIS REQUIREMENTS:
     1. Verify the video shows the requested subject/location
@@ -550,16 +585,29 @@ export async function verifyAudio(
   secretCriteria: string[],
   mediaRequirements?: MediaRequirements,
   userGps?: Coordinates,
-  targetGps?: Coordinates
+  targetGps?: Coordinates,
+  gpsAccuracy?: number
 ): Promise<VerificationResult> {
   const model = getModel('verification');
 
   // Calculate distance if GPS available
   let distanceFromTarget: number | undefined;
+  let gpsConfidence: number | undefined;
   if (userGps && targetGps) {
     const distanceData = calculateStraightLineDistance(userGps, targetGps);
     distanceFromTarget = distanceData.distanceMeters;
+    gpsConfidence = calculateGpsConfidence(distanceFromTarget, gpsAccuracy);
+    console.log('[Verification] GPS boost check (audio):', {
+      distance: `${distanceFromTarget.toFixed(0)}m`,
+      accuracy: gpsAccuracy ? `±${gpsAccuracy.toFixed(0)}m` : 'unknown',
+      confidence: gpsConfidence.toFixed(2)
+    });
   }
+
+  // Build GPS context for prompt if user is close to target
+  const gpsBoostContext = gpsConfidence && gpsConfidence >= 0.5
+    ? `\n\nGPS CONTEXT: User is ${distanceFromTarget?.toFixed(0)}m from target location. GPS confidence: ${(gpsConfidence * 100).toFixed(0)}%. If the audio appears to be from a similar location type, be more lenient.`
+    : '';
 
   // Check duration requirements
   const minDuration = mediaRequirements?.minDuration || 10;
@@ -587,7 +635,7 @@ export async function verifyAudio(
 
   const prompt = `
     Analyze this audio recording against the objective: "${objective}".
-    Specifically listen for these criteria: ${secretCriteria.join(', ')}.
+    Specifically listen for these criteria: ${secretCriteria.join(', ')}.${gpsBoostContext}
 
     AUDIO ANALYSIS REQUIREMENTS:
     1. If this is a verbal description, assess if the description matches the location/scene
@@ -646,7 +694,8 @@ export async function verifyMedia(
   secretCriteria: string[],
   mediaRequirements?: MediaRequirements,
   userGps?: Coordinates,
-  targetGps?: Coordinates
+  targetGps?: Coordinates,
+  gpsAccuracy?: number
 ): Promise<VerificationResult> {
   switch (captureData.type) {
     case 'video':
@@ -658,7 +707,8 @@ export async function verifyMedia(
         secretCriteria,
         mediaRequirements,
         userGps,
-        targetGps
+        targetGps,
+        gpsAccuracy
       );
 
     case 'audio':
@@ -670,7 +720,8 @@ export async function verifyMedia(
         secretCriteria,
         mediaRequirements,
         userGps,
-        targetGps
+        targetGps,
+        gpsAccuracy
       );
 
     case 'photo':
@@ -680,7 +731,8 @@ export async function verifyMedia(
         objective,
         secretCriteria,
         userGps,
-        targetGps
+        targetGps,
+        gpsAccuracy
       );
   }
 }

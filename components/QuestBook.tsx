@@ -101,23 +101,23 @@ export default function QuestBook({
         <div className="flex border-b-2 border-zinc-800">
           <button
             onClick={() => setActiveTab('current')}
-            className={`flex-1 py-3 font-pixel text-sm transition-colors ${
+            className={`flex-1 py-3 text-sm font-semibold uppercase tracking-wide transition-colors ${
               activeTab === 'current'
                 ? 'bg-zinc-800 text-adventure-gold border-b-2 border-adventure-gold'
                 : 'text-gray-500 hover:text-gray-300'
             }`}
           >
-            CURRENT
+            Current
           </button>
           <button
             onClick={() => setActiveTab('history')}
-            className={`flex-1 py-3 font-pixel text-sm transition-colors ${
+            className={`flex-1 py-3 text-sm font-semibold uppercase tracking-wide transition-colors ${
               activeTab === 'history'
                 ? 'bg-zinc-800 text-adventure-gold border-b-2 border-adventure-gold'
                 : 'text-gray-500 hover:text-gray-300'
             }`}
           >
-            HISTORY ({campaignHistory.length})
+            History ({campaignHistory.length})
           </button>
         </div>
 
@@ -135,7 +135,7 @@ export default function QuestBook({
                 {currentCampaign ? (
                   <>
                     <div className="bg-zinc-950 border border-adventure-emerald/30 rounded-lg p-4">
-                      <h3 className="font-pixel text-adventure-emerald text-sm mb-2">
+                      <h3 className="font-semibold text-adventure-emerald text-sm mb-2">
                         {currentCampaign.location}
                       </h3>
                       <div className="flex gap-4 text-xs text-gray-400 font-sans">
@@ -178,7 +178,7 @@ export default function QuestBook({
                             <div className="flex-1">
                               {status === 'locked' ? (
                                 <>
-                                  <h4 className="font-pixel text-sm text-zinc-600 mb-1">
+                                  <h4 className="font-semibold text-sm text-zinc-600 mb-1">
                                     {toGalactic(`Quest ${index + 1}`)}
                                   </h4>
                                   <p className="text-xs text-zinc-700 font-sans">
@@ -200,7 +200,7 @@ export default function QuestBook({
                               ) : (
                                 <>
                                   <h4
-                                    className={`font-pixel text-sm mb-1 ${
+                                    className={`font-semibold text-sm mb-1 ${
                                       status === 'completed'
                                         ? 'text-emerald-500'
                                         : status === 'current'
@@ -261,23 +261,23 @@ export default function QuestBook({
                   <div className="bg-zinc-950 border border-adventure-gold/30 rounded-lg p-4">
                     <div className="flex items-center gap-2 mb-3">
                       <Trophy className="w-5 h-5 text-adventure-gold" />
-                      <h3 className="font-pixel text-adventure-gold text-sm">YOUR STATS</h3>
+                      <h3 className="font-semibold uppercase text-adventure-gold text-sm">Your Stats</h3>
                     </div>
                     <div className="grid grid-cols-3 gap-3 text-center">
                       <div>
-                        <div className="text-2xl font-pixel text-adventure-emerald">
+                        <div className="text-2xl font-bold tabular-nums text-adventure-emerald">
                           {totalCampaigns}
                         </div>
                         <div className="text-xs text-gray-500 font-sans">Campaigns</div>
                       </div>
                       <div>
-                        <div className="text-2xl font-pixel text-adventure-emerald">
+                        <div className="text-2xl font-bold tabular-nums text-adventure-emerald">
                           {totalQuestsCompleted}
                         </div>
                         <div className="text-xs text-gray-500 font-sans">Quests</div>
                       </div>
                       <div>
-                        <div className="text-2xl font-pixel text-adventure-emerald">
+                        <div className="text-2xl font-bold tabular-nums text-adventure-emerald">
                           {totalDistanceAllCampaigns.toFixed(1)}
                         </div>
                         <div className="text-xs text-gray-500 font-sans">km</div>
@@ -304,7 +304,7 @@ export default function QuestBook({
                         >
                           <div className="flex items-start justify-between">
                             <div className="flex-1">
-                              <h4 className="font-pixel text-sm text-adventure-emerald mb-1">
+                              <h4 className="font-semibold text-sm text-adventure-emerald mb-1">
                                 {stored.campaign.location}
                               </h4>
                               <div className="flex gap-3 text-xs text-gray-500 font-sans">

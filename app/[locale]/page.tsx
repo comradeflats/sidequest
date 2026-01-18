@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Compass, Zap, Map, CheckCircle, XCircle, Camera, Video, Mic, Navigation, MessageSquare, ExternalLink, RefreshCw, Crosshair, Info, ListChecks } from 'lucide-react';
+import { MapPin, Compass, Zap, Map, CheckCircle, XCircle, Camera, Video, Mic, Navigation, MessageSquare, ExternalLink, RefreshCw, Crosshair } from 'lucide-react';
 import { generateCampaign, verifyMedia, verifyMediaWithAppeal } from '@/lib/game-logic';
 import { geocodeLocation } from '@/lib/location';
 import { generateQuestImage } from '@/lib/gemini';
@@ -27,10 +27,7 @@ import {
   markCampaignComplete,
   addToHistory,
   getCampaignHistory,
-  addXP,
-  getQuestTypePreferences,
-  saveQuestTypePreferences,
-  QuestTypePreferences
+  addXP
 } from '@/lib/storage';
 
 export default function Home() {
@@ -57,13 +54,6 @@ export default function Home() {
   const [lastCaptureData, setLastCaptureData] = useState<MediaCaptureData | null>(null);
   const [isAppealing, setIsAppealing] = useState(false);
 
-  // Quest Type Preferences State
-  const [questTypePrefs, setQuestTypePrefs] = useState<QuestTypePreferences>({
-    enableVideoQuests: false,
-    enableAudioQuests: false,
-    guaranteedMix: false
-  });
-
   // Journey Tracking State
   const [showJourneyMap, setShowJourneyMap] = useState(false);
 
@@ -80,7 +70,7 @@ export default function Home() {
   // XP State
   const [xpGain, setXpGain] = useState<{ amount: number; timestamp: number } | null>(null);
 
-  // Ref for auto-scrolling to loading area
+  // Ref for auto-scrolling to loading area on setup page
   const loadingRef = useRef<HTMLDivElement>(null);
 
   // Initialize GPS tracking hook
@@ -168,21 +158,15 @@ export default function Home() {
     loadHistory();
   }, [campaign]); // Refresh when campaign changes (e.g., completion)
 
-  // Auto-scroll to loading area when loading starts
+  // Auto-scroll to loading area on setup page when loading starts
   useEffect(() => {
-    if (isLoading && loadingRef.current) {
+    if (isLoading && !campaign && loadingRef.current) {
       // Small delay to ensure the loading component is rendered
       setTimeout(() => {
         loadingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }, 100);
     }
-  }, [isLoading]);
-
-  // Load quest type preferences on mount
-  useEffect(() => {
-    const prefs = getQuestTypePreferences();
-    setQuestTypePrefs(prefs);
-  }, []);
+  }, [isLoading, campaign]);
 
   const handleGeocodeLocation = async () => {
     if (!location.trim()) return;
@@ -261,6 +245,7 @@ export default function Home() {
     // Restore campaign (with existing or regenerated images)
     setCampaign(stored.campaign);
     setCompletedQuests(stored.progress.completedQuests);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
 
     // Restore journey stats if available
     if (stored.journeyStats) {
@@ -289,6 +274,15 @@ export default function Home() {
     "FINDING LEGENDARY LOCATIONS..."
   ];
 
+  const VERIFICATION_MESSAGES = [
+    "SCANNING VISUAL DATA...",
+    "ANALYZING COMPOSITION...",
+    "CHECKING QUEST CRITERIA...",
+    "CONSULTING THE AI ORACLE...",
+    "EVALUATING YOUR SUBMISSION...",
+    "CROSS-REFERENCING OBJECTIVES..."
+  ];
+
   const handleDeclineResume = async () => {
     if (savedCampaignId) {
       await clearCurrentCampaign();
@@ -306,17 +300,18 @@ export default function Home() {
 
     setIsLoading(true);
     try {
-      // Build campaign options with quest type preferences
+      // Always use guaranteed mix mode: 1 photo, 1 video, 1 audio quest
       const campaignOptions: CampaignOptions = {
-        enableVideoQuests: questTypePrefs.enableVideoQuests,
-        enableAudioQuests: questTypePrefs.enableAudioQuests,
-        guaranteedMix: questTypePrefs.guaranteedMix
+        enableVideoQuests: true,
+        enableAudioQuests: true,
+        guaranteedMix: true
       };
 
       // Use geocodedLocation.name to pass to generateCampaign (which will geocode again)
       // The function will re-geocode, but we've already confirmed the location is valid
       const newCampaign = await generateCampaign(geocodedLocation.name, type, distanceRange, campaignOptions);
       setCampaign(newCampaign);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
 
       // Track campaign creation
       trackEvent({
@@ -348,6 +343,17 @@ export default function Home() {
     const mediaType = captureData.type;
 
     try {
+      // Force fresh GPS reading before verification for accurate location boost
+      const freshGps = await refreshLocation();
+      const verificationGps = freshGps || userGps;
+      const verificationAccuracy = freshGps ? gpsAccuracy : gpsAccuracy;
+
+      console.log('[Verification] GPS for verification:', {
+        fresh: !!freshGps,
+        coords: verificationGps ? `${verificationGps.lat.toFixed(6)}, ${verificationGps.lng.toFixed(6)}` : 'none',
+        accuracy: verificationAccuracy ? `±${verificationAccuracy.toFixed(0)}m` : 'unknown'
+      });
+
       // Track verification attempt
       trackEvent({
         name: 'verification_attempt',
@@ -364,8 +370,9 @@ export default function Home() {
         currentQuest.objective,
         currentQuest.secretCriteria,
         currentQuest.mediaRequirements,
-        userGps || undefined,
-        currentQuest.coordinates
+        verificationGps || undefined,
+        currentQuest.coordinates,
+        verificationAccuracy || undefined
       );
 
       setResult(verification);
@@ -487,6 +494,7 @@ export default function Home() {
       setCampaign({ ...campaign, currentQuestIndex: nextIndex });
       setResult(null);
       setIsVerifying(false);
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } else {
       // Campaign complete! Mark it and add to history
       await markCampaignComplete(campaign.id);
@@ -546,15 +554,23 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black text-emerald-400 p-6 selection:bg-emerald-900 selection:text-emerald-100">
-      {/* Quest Book Button - Fixed Position */}
+      {/* Fixed Header Buttons */}
       {campaign && (
-        <button
-          onClick={() => setShowQuestBook(true)}
-          className="fixed top-4 right-4 z-40 bg-adventure-gold text-black px-4 py-2 rounded-lg shadow-lg hover:bg-yellow-500 transition-colors flex items-center gap-2 font-pixel text-sm"
-        >
-          <MapPin className="w-4 h-4" />
-          QUEST BOOK
-        </button>
+        <>
+          {/* XP Header - Fixed Position Left */}
+          <div className="fixed top-4 left-4 z-40">
+            <XPHeader onXPGain={xpGain} />
+          </div>
+
+          {/* Quest Book Button - Fixed Position Right */}
+          <button
+            onClick={() => setShowQuestBook(true)}
+            className="fixed top-4 right-4 z-40 bg-adventure-gold text-black px-4 py-2 rounded-lg shadow-lg hover:bg-yellow-500 transition-colors flex items-center gap-2 font-pixel text-sm"
+          >
+            <MapPin className="w-4 h-4" />
+            QUEST BOOK
+          </button>
+        </>
       )}
 
       <div className="max-w-md mx-auto pt-12 pb-20">
@@ -710,119 +726,6 @@ export default function Home() {
                 onSelect={setDistanceRange}
               />
 
-              {/* Quest Type Settings */}
-              <div className="space-y-3">
-                <label className="block text-xs font-pixel text-adventure-gold flex items-center gap-2">
-                  QUEST_TYPES
-                  <span className="text-gray-500 font-sans font-normal">(experimental)</span>
-                </label>
-                <div className="bg-zinc-900 border-2 border-zinc-800 rounded-lg p-4 space-y-3">
-                  {/* Guaranteed Mix Toggle */}
-                  <label className="flex items-center justify-between cursor-pointer group">
-                    <div className="flex items-center gap-3">
-                      <ListChecks className={`w-5 h-5 ${questTypePrefs.guaranteedMix ? 'text-adventure-gold' : 'text-gray-500'}`} />
-                      <div>
-                        <span className="text-sm font-sans text-white">Guaranteed Mix</span>
-                        <p className="text-xs text-gray-500">Exactly 1 photo, 1 video, and 1 audio quest</p>
-                      </div>
-                    </div>
-                    <div
-                      onClick={() => {
-                        const newGuaranteedMix = !questTypePrefs.guaranteedMix;
-                        const newPrefs = {
-                          ...questTypePrefs,
-                          guaranteedMix: newGuaranteedMix,
-                          // When enabling guaranteed mix, also enable video and audio
-                          enableVideoQuests: newGuaranteedMix ? true : questTypePrefs.enableVideoQuests,
-                          enableAudioQuests: newGuaranteedMix ? true : questTypePrefs.enableAudioQuests
-                        };
-                        setQuestTypePrefs(newPrefs);
-                        saveQuestTypePreferences(newPrefs);
-                      }}
-                      className={`relative w-12 h-6 rounded-full transition-colors ${
-                        questTypePrefs.guaranteedMix ? 'bg-adventure-gold' : 'bg-zinc-700'
-                      }`}
-                    >
-                      <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                        questTypePrefs.guaranteedMix ? 'translate-x-7' : 'translate-x-1'
-                      }`} />
-                    </div>
-                  </label>
-
-                  {questTypePrefs.guaranteedMix && (
-                    <div className="flex items-start gap-2 py-2 px-3 bg-adventure-gold/10 border border-adventure-gold/30 rounded">
-                      <Info className="w-4 h-4 text-adventure-gold flex-shrink-0 mt-0.5" />
-                      <p className="text-xs text-adventure-gold">
-                        Quick Hunt will include all 3 media types for a complete experience.
-                      </p>
-                    </div>
-                  )}
-
-                  {!questTypePrefs.guaranteedMix && (
-                    <>
-                      {/* Video Quests Toggle */}
-                      <label className="flex items-center justify-between cursor-pointer group">
-                        <div className="flex items-center gap-3">
-                          <Video className={`w-5 h-5 ${questTypePrefs.enableVideoQuests ? 'text-red-500' : 'text-gray-500'}`} />
-                          <div>
-                            <span className="text-sm font-sans text-white">Video Quests</span>
-                            <p className="text-xs text-gray-500">Record motion at fountains, streets, etc.</p>
-                          </div>
-                        </div>
-                        <div
-                          onClick={() => {
-                            const newPrefs = { ...questTypePrefs, enableVideoQuests: !questTypePrefs.enableVideoQuests };
-                            setQuestTypePrefs(newPrefs);
-                            saveQuestTypePreferences(newPrefs);
-                          }}
-                          className={`relative w-12 h-6 rounded-full transition-colors ${
-                            questTypePrefs.enableVideoQuests ? 'bg-red-500' : 'bg-zinc-700'
-                          }`}
-                        >
-                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                            questTypePrefs.enableVideoQuests ? 'translate-x-7' : 'translate-x-1'
-                          }`} />
-                        </div>
-                      </label>
-
-                      {/* Audio Quests Toggle */}
-                      <label className="flex items-center justify-between cursor-pointer group">
-                        <div className="flex items-center gap-3">
-                          <Mic className={`w-5 h-5 ${questTypePrefs.enableAudioQuests ? 'text-purple-500' : 'text-gray-500'}`} />
-                          <div>
-                            <span className="text-sm font-sans text-white">Audio Quests</span>
-                            <p className="text-xs text-gray-500">Record sounds at markets, stations, etc.</p>
-                          </div>
-                        </div>
-                        <div
-                          onClick={() => {
-                            const newPrefs = { ...questTypePrefs, enableAudioQuests: !questTypePrefs.enableAudioQuests };
-                            setQuestTypePrefs(newPrefs);
-                            saveQuestTypePreferences(newPrefs);
-                          }}
-                          className={`relative w-12 h-6 rounded-full transition-colors ${
-                            questTypePrefs.enableAudioQuests ? 'bg-purple-500' : 'bg-zinc-700'
-                          }`}
-                        >
-                          <div className={`absolute top-1 w-4 h-4 rounded-full bg-white transition-transform ${
-                            questTypePrefs.enableAudioQuests ? 'translate-x-7' : 'translate-x-1'
-                          }`} />
-                        </div>
-                      </label>
-
-                      {(questTypePrefs.enableVideoQuests || questTypePrefs.enableAudioQuests) && (
-                        <div className="flex items-start gap-2 mt-2 pt-2 border-t border-zinc-800">
-                          <Info className="w-4 h-4 text-adventure-sky flex-shrink-0 mt-0.5" />
-                          <p className="text-xs text-gray-400">
-                            Gemini will create a mix of quest types based on what fits each location.
-                          </p>
-                        </div>
-                      )}
-                    </>
-                  )}
-                </div>
-              </div>
-
               {/* Campaign Type Selection */}
               <div className="space-y-3">
                 <label className="block text-xs font-pixel text-adventure-gold">
@@ -876,7 +779,8 @@ export default function Home() {
               {!result ? (
                 <LoadingProgress
                   message="ANALYZING..."
-                  subMessage={`Gemini is verifying your ${lastCaptureData?.type || 'submission'}`}
+                  subMessage={`Verifying your ${lastCaptureData?.type || 'submission'}`}
+                  rotatingMessages={VERIFICATION_MESSAGES}
                 />
               ) : (
                 <div className="space-y-6">
@@ -947,9 +851,6 @@ export default function Home() {
 
                 return (
                   <>
-                    {/* XP Header - Embedded in quest flow */}
-                    <XPHeader onXPGain={xpGain} />
-
                     {/* Quest Image - Hero Position */}
                     {currentQuest.imageUrl && !currentQuest.imageGenerationFailed && (
                       <div className="relative -mx-6 mb-6 quest-image-hero overflow-hidden">
