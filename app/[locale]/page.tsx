@@ -19,6 +19,7 @@ import QuestBook from '@/components/QuestBook';
 import LoadingProgress from '@/components/LoadingProgress';
 import QuestPreview from '@/components/QuestPreview';
 import XPHeader from '@/components/XPHeader';
+import ThinkingPanel from '@/components/ThinkingPanel';
 import {
   getCurrentCampaignId,
   loadCampaign,
@@ -29,6 +30,7 @@ import {
   getCampaignHistory,
   addXP
 } from '@/lib/storage';
+import { useSessionContext } from '@/hooks/useSessionContext';
 
 export default function Home() {
   const [location, setLocation] = useState('');
@@ -94,6 +96,18 @@ export default function Home() {
         localStorage.setItem(`journey_${campaign.id}`, JSON.stringify(stats));
       }
     }
+  });
+
+  // Initialize session context hook (Gemini 3 Marathon Agent feature)
+  const {
+    context: sessionContext,
+    recordAttempt: recordSessionAttempt,
+    startAttempt: startSessionAttempt,
+    getVerificationHint,
+    resetContext: resetSessionContext
+  } = useSessionContext({
+    campaignId: campaign?.id || null,
+    enabled: !!campaign
   });
 
   // Update GPS state when geolocation changes
@@ -294,9 +308,10 @@ export default function Home() {
   const startAdventure = async (type: 'short' | 'long') => {
     if (!geocodedLocation || !distanceRange) return;
 
-    // Clear any previous campaign
+    // Clear any previous campaign and session context
     await clearCurrentCampaign();
     setCompletedQuests([]);
+    resetSessionContext();
 
     setIsLoading(true);
     try {
@@ -342,6 +357,9 @@ export default function Home() {
     const currentQuest = campaign.quests[campaign.currentQuestIndex];
     const mediaType = captureData.type;
 
+    // Start session attempt tracking (Gemini 3 Marathon Agent)
+    startSessionAttempt(currentQuest.id);
+
     try {
       // Force fresh GPS reading before verification for accurate location boost
       const freshGps = await refreshLocation();
@@ -364,6 +382,9 @@ export default function Home() {
         }
       });
 
+      // Get session context hint for personalized AI responses (Gemini 3 1M Context)
+      const sessionContextHint = getVerificationHint();
+
       // Verify the media using unified verifyMedia function
       const verification = await verifyMedia(
         captureData,
@@ -372,10 +393,22 @@ export default function Home() {
         currentQuest.mediaRequirements,
         verificationGps || undefined,
         currentQuest.coordinates,
-        verificationAccuracy || undefined
+        verificationAccuracy || undefined,
+        sessionContextHint
       );
 
       setResult(verification);
+
+      // Record session attempt with thinking data (Gemini 3 Marathon Agent)
+      recordSessionAttempt({
+        questId: currentQuest.id,
+        questTitle: currentQuest.title,
+        questType: currentQuest.questType || 'PHOTO',
+        success: verification.success,
+        feedback: verification.feedback,
+        thinkingSteps: verification.thinking,
+        distanceFromTarget: verification.distanceFromTarget
+      });
 
       // Track verification result
       if (verification.success) {
@@ -443,6 +476,16 @@ export default function Home() {
         success: appealResult.success,
         feedback: appealResult.feedback,
         reasoning: appealResult.reasoning
+      });
+
+      // Record session attempt after appeal (Gemini 3 Marathon Agent)
+      recordSessionAttempt({
+        questId: currentQuest.id,
+        questTitle: currentQuest.title,
+        questType: currentQuest.questType || 'PHOTO',
+        success: appealResult.success,
+        feedback: appealResult.feedback,
+        distanceFromTarget: result?.distanceFromTarget
       });
 
       // Track appeal result
@@ -801,6 +844,16 @@ export default function Home() {
                     <p className="text-sm font-sans text-white/90 italic leading-relaxed">
                       &ldquo;{result.feedback}&rdquo;
                     </p>
+
+                    {/* AI Thinking Panel - Transparent Reasoning */}
+                    {result.thinking && result.thinking.length > 0 && (
+                      <ThinkingPanel
+                        thinking={result.thinking}
+                        overallConfidence={result.overallConfidence || 0}
+                        distanceFromTarget={result.distanceFromTarget}
+                        success={result.success}
+                      />
+                    )}
                   </div>
 
                   {result.success ? (

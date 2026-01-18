@@ -146,6 +146,14 @@ export interface MediaCaptureData {
   mimeType?: string;  // e.g., 'video/webm', 'audio/webm'
 }
 
+// Thinking step for transparent AI reasoning (Gemini 3 feature)
+export interface ThinkingStep {
+  criterion: string;      // What's being checked
+  observation: string;    // What the AI sees/hears
+  passed: boolean;        // Did it pass this criterion?
+  confidence: number;     // 0-100 confidence level
+}
+
 export interface VerificationResult {
   success: boolean;
   feedback: string;
@@ -153,6 +161,9 @@ export interface VerificationResult {
   appealable?: boolean;          // Can this be appealed?
   distanceFromTarget?: number;   // GPS distance in meters
   mediaType?: MediaType;         // Type of media that was verified
+  // Thinking Levels - Transparent AI reasoning
+  thinking?: ThinkingStep[];     // Step-by-step analysis
+  overallConfidence?: number;    // 0-100 overall confidence
 }
 
 export interface AppealData {

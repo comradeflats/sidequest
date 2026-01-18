@@ -324,7 +324,8 @@ export async function verifyPhoto(
   secretCriteria: string[],
   userGps?: Coordinates,
   targetGps?: Coordinates,
-  gpsAccuracy?: number
+  gpsAccuracy?: number,
+  sessionContextHint?: string
 ): Promise<VerificationResult> {
   const model = getModel('verification'); // Gemini 3 Flash is great for vision speed
 
@@ -347,15 +348,33 @@ export async function verifyPhoto(
     ? `\n\nGPS CONTEXT: User is ${distanceFromTarget?.toFixed(0)}m from target location. GPS confidence: ${(gpsConfidence * 100).toFixed(0)}%. If the photo appears to be at a similar location type, be more lenient.`
     : '';
 
+  // Build session context injection
+  const contextInjection = sessionContextHint || '';
+
   const prompt = `
     Analyze this image against the objective: "${objective}".
-    Specifically look for these criteria: ${secretCriteria.join(', ')}.${gpsBoostContext}
+
+    STEP-BY-STEP ANALYSIS REQUIRED:
+    For each criterion below, describe what you observe and your confidence level.
+
+    Criteria to verify:
+    ${secretCriteria.map((c, i) => `${i + 1}. ${c}`).join('\n    ')}
+    ${gpsBoostContext}${contextInjection}
 
     Respond in JSON format:
     {
       "success": boolean,
       "feedback": "A witty, personality-driven comment on the photo. If it failed, give a hint.",
-      "appealable": boolean (true if close but not quite right, false if completely wrong)
+      "appealable": boolean (true if close but not quite right, false if completely wrong),
+      "thinking": [
+        {
+          "criterion": "what you're checking (brief)",
+          "observation": "what you actually see in the image",
+          "passed": boolean,
+          "confidence": 0-100
+        }
+      ],
+      "overallConfidence": 0-100
     }
   `;
 
@@ -420,6 +439,12 @@ export async function verifyPhotoWithAppeal(
     - GPS Confidence: ${gpsConfidence.toFixed(2)} ${getGpsConfidenceLabel(gpsConfidence)}
     ${gpsConfidence > 0.8 ? '- STRONG SIGNAL: User is very close to target!' : ''}
 
+    STEP-BY-STEP RE-ANALYSIS REQUIRED:
+    For each criterion, re-evaluate considering the user's context.
+
+    Criteria to verify:
+    ${secretCriteria.map((c, i) => `${i + 1}. ${c}`).join('\n    ')}
+
     INSTRUCTIONS:
     1. Consider if the user's explanation reveals legitimate environmental differences
        (e.g., "The station here is green/yellow, not blue/yellow")
@@ -433,7 +458,16 @@ export async function verifyPhotoWithAppeal(
       "feedback": "Witty response acknowledging their context or explaining continued rejection",
       "reasoning": "Internal explanation of your decision",
       "acceptedContext": boolean (did user's explanation help?),
-      "gpsWasHelpful": boolean (did GPS proximity influence your decision?)
+      "gpsWasHelpful": boolean (did GPS proximity influence your decision?),
+      "thinking": [
+        {
+          "criterion": "what you're re-checking (brief)",
+          "observation": "what you see, considering user's context",
+          "passed": boolean,
+          "confidence": 0-100
+        }
+      ],
+      "overallConfidence": 0-100
     }
   `;
 
@@ -475,7 +509,8 @@ export async function verifyVideo(
   mediaRequirements?: MediaRequirements,
   userGps?: Coordinates,
   targetGps?: Coordinates,
-  gpsAccuracy?: number
+  gpsAccuracy?: number,
+  sessionContextHint?: string
 ): Promise<VerificationResult> {
   const model = getModel('verification');
 
@@ -522,14 +557,22 @@ export async function verifyVideo(
     };
   }
 
+  // Build session context injection
+  const contextInjection = sessionContextHint || '';
+
   const prompt = `
     Analyze this video against the objective: "${objective}".
-    Specifically look for these criteria: ${secretCriteria.join(', ')}.${gpsBoostContext}
 
-    VIDEO ANALYSIS REQUIREMENTS:
-    1. Verify the video shows the requested subject/location
-    2. Check for actual motion/activity (not a static image recorded as video)
-    3. Assess if the video captures what was requested
+    STEP-BY-STEP ANALYSIS REQUIRED:
+    For each criterion below, describe what you observe and your confidence level.
+
+    Criteria to verify:
+    ${secretCriteria.map((c, i) => `${i + 1}. ${c}`).join('\n    ')}
+
+    Additional video requirements:
+    - Verify the video shows the requested subject/location
+    - Check for actual motion/activity (not a static image recorded as video)
+    ${gpsBoostContext}${contextInjection}
 
     Duration of video: ${duration} seconds
 
@@ -538,7 +581,16 @@ export async function verifyVideo(
       "success": boolean,
       "feedback": "A witty, personality-driven comment on the video. If it failed, give a hint.",
       "appealable": boolean (true if close but not quite right, false if completely wrong),
-      "hasMotion": boolean (did the video contain actual motion/activity?)
+      "hasMotion": boolean (did the video contain actual motion/activity?),
+      "thinking": [
+        {
+          "criterion": "what you're checking (brief)",
+          "observation": "what you see in the video frames",
+          "passed": boolean,
+          "confidence": 0-100
+        }
+      ],
+      "overallConfidence": 0-100
     }
   `;
 
@@ -586,7 +638,8 @@ export async function verifyAudio(
   mediaRequirements?: MediaRequirements,
   userGps?: Coordinates,
   targetGps?: Coordinates,
-  gpsAccuracy?: number
+  gpsAccuracy?: number,
+  sessionContextHint?: string
 ): Promise<VerificationResult> {
   const model = getModel('verification');
 
@@ -633,14 +686,22 @@ export async function verifyAudio(
     };
   }
 
+  // Build session context injection
+  const contextInjection = sessionContextHint || '';
+
   const prompt = `
     Analyze this audio recording against the objective: "${objective}".
-    Specifically listen for these criteria: ${secretCriteria.join(', ')}.${gpsBoostContext}
 
-    AUDIO ANALYSIS REQUIREMENTS:
-    1. If this is a verbal description, assess if the description matches the location/scene
-    2. If this is ambient sound, verify characteristic sounds are present
-    3. Check for relevant audio content that matches the quest objective
+    STEP-BY-STEP ANALYSIS REQUIRED:
+    For each criterion below, describe what you hear and your confidence level.
+
+    Criteria to verify:
+    ${secretCriteria.map((c, i) => `${i + 1}. ${c}`).join('\n    ')}
+
+    Additional audio analysis:
+    - If this is a verbal description, assess if the description matches the location/scene
+    - If this is ambient sound, verify characteristic sounds are present
+    ${gpsBoostContext}${contextInjection}
 
     Duration of audio: ${duration} seconds
 
@@ -649,7 +710,16 @@ export async function verifyAudio(
       "success": boolean,
       "feedback": "A witty, personality-driven comment on the audio. If it failed, give a hint.",
       "appealable": boolean (true if close but not quite right, false if completely wrong),
-      "transcription": "Brief summary of what was heard (speech or ambient sounds)"
+      "transcription": "Brief summary of what was heard (speech or ambient sounds)",
+      "thinking": [
+        {
+          "criterion": "what you're checking (brief)",
+          "observation": "what you hear in the audio",
+          "passed": boolean,
+          "confidence": 0-100
+        }
+      ],
+      "overallConfidence": 0-100
     }
   `;
 
@@ -695,7 +765,8 @@ export async function verifyMedia(
   mediaRequirements?: MediaRequirements,
   userGps?: Coordinates,
   targetGps?: Coordinates,
-  gpsAccuracy?: number
+  gpsAccuracy?: number,
+  sessionContextHint?: string
 ): Promise<VerificationResult> {
   switch (captureData.type) {
     case 'video':
@@ -708,7 +779,8 @@ export async function verifyMedia(
         mediaRequirements,
         userGps,
         targetGps,
-        gpsAccuracy
+        gpsAccuracy,
+        sessionContextHint
       );
 
     case 'audio':
@@ -721,7 +793,8 @@ export async function verifyMedia(
         mediaRequirements,
         userGps,
         targetGps,
-        gpsAccuracy
+        gpsAccuracy,
+        sessionContextHint
       );
 
     case 'photo':
@@ -732,7 +805,8 @@ export async function verifyMedia(
         secretCriteria,
         userGps,
         targetGps,
-        gpsAccuracy
+        gpsAccuracy,
+        sessionContextHint
       );
   }
 }
@@ -770,6 +844,12 @@ export async function verifyMediaWithAppeal(
     - GPS Confidence: ${gpsConfidence.toFixed(2)} ${getGpsConfidenceLabel(gpsConfidence)}
     ${gpsConfidence > 0.8 ? '- STRONG SIGNAL: User is very close to target!' : ''}
 
+    STEP-BY-STEP RE-ANALYSIS REQUIRED:
+    For each criterion, re-evaluate considering the user's context.
+
+    Criteria to verify:
+    ${secretCriteria.map((c, i) => `${i + 1}. ${c}`).join('\n    ')}
+
     INSTRUCTIONS:
     1. Consider if the user's explanation reveals legitimate environmental differences
     2. If GPS shows user is <30m from target, be more lenient with variations
@@ -782,7 +862,16 @@ export async function verifyMediaWithAppeal(
       "feedback": "Witty response acknowledging their context or explaining continued rejection",
       "reasoning": "Internal explanation of your decision",
       "acceptedContext": boolean (did user's explanation help?),
-      "gpsWasHelpful": boolean (did GPS proximity influence your decision?)
+      "gpsWasHelpful": boolean (did GPS proximity influence your decision?),
+      "thinking": [
+        {
+          "criterion": "what you're re-checking (brief)",
+          "observation": "what you ${captureData.type === 'audio' ? 'hear' : 'see'}, considering user's context",
+          "passed": boolean,
+          "confidence": 0-100
+        }
+      ],
+      "overallConfidence": 0-100
     }
   `;
 
