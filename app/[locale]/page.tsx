@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Compass, Zap, Map, CheckCircle, XCircle, Camera, Video, Mic, Navigation, MessageSquare, ExternalLink, RefreshCw, Crosshair } from 'lucide-react';
+import { MapPin, Compass, Zap, Map, CheckCircle, XCircle, Camera, Video, Mic, Navigation, MessageSquare, ExternalLink, RefreshCw, Crosshair, BookOpen } from 'lucide-react';
 import { generateCampaign, verifyMedia, verifyMediaWithAppeal } from '@/lib/game-logic';
 import { geocodeLocation } from '@/lib/location';
 import { generateQuestImage } from '@/lib/gemini';
@@ -568,7 +568,7 @@ export default function Home() {
             className="fixed top-4 right-4 z-40 w-14 h-14 bg-black/90 rounded-full border border-adventure-gold/30 shadow-lg hover:border-adventure-gold hover:bg-black transition-colors flex items-center justify-center"
             aria-label="Open Quest Book"
           >
-            <MapPin className="w-6 h-6 text-adventure-gold" />
+            <BookOpen className="w-6 h-6 text-adventure-gold" />
           </button>
         </>
       )}
