@@ -565,15 +565,15 @@ export default function Home() {
           {/* Quest Book Button - Fixed Position Right */}
           <button
             onClick={() => setShowQuestBook(true)}
-            className="fixed top-4 right-4 z-40 bg-adventure-gold text-black px-4 py-2 rounded-lg shadow-lg hover:bg-yellow-500 transition-colors flex items-center gap-2 font-pixel text-sm"
+            className="fixed top-4 right-4 z-40 w-14 h-14 bg-black/90 rounded-full border border-adventure-gold/30 shadow-lg hover:border-adventure-gold hover:bg-black transition-colors flex items-center justify-center"
+            aria-label="Open Quest Book"
           >
-            <MapPin className="w-4 h-4" />
-            QUEST BOOK
+            <MapPin className="w-6 h-6 text-adventure-gold" />
           </button>
         </>
       )}
 
-      <div className="max-w-md mx-auto pt-12 pb-20">
+      <div className="max-w-md mx-auto pt-20 pb-20">
         <header className="mb-12 text-center">
           <motion.h1
             initial={{ opacity: 0, y: -20 }}
