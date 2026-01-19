@@ -48,7 +48,7 @@ export default function ThinkingPanel({
   const gpsInfo = distanceFromTarget !== undefined ? getGpsLabel(distanceFromTarget) : null;
 
   return (
-    <div className="mt-4">
+    <div className="mt-4 text-left">
       {/* Toggle Button */}
       <button
         onClick={() => setIsExpanded(!isExpanded)}
@@ -156,12 +156,12 @@ export default function ThinkingPanel({
 
               {/* Overall Confidence Footer */}
               <div className={`px-4 py-3 border-t border-zinc-700 ${success ? 'bg-adventure-emerald/10' : 'bg-red-500/10'}`}>
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-pixel text-gray-400">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-xs font-pixel text-gray-400 flex-shrink-0">
                     OVERALL CONFIDENCE
                   </span>
-                  <div className="flex items-center gap-2">
-                    <div className="w-24 h-2 bg-zinc-700 rounded-full overflow-hidden">
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <div className="w-20 h-2 bg-zinc-700 rounded-full overflow-hidden">
                       <motion.div
                         initial={{ width: 0 }}
                         animate={{ width: `${overallConfidence}%` }}
