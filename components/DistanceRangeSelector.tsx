@@ -20,7 +20,7 @@ export default function DistanceRangeSelector({ selectedRange, onSelect }: Props
   return (
     <div className="space-y-3">
       <label className="block text-xs font-pixel text-adventure-gold">
-        SELECT_DISTANCE_RANGE
+        RANGE
       </label>
       <div className="grid grid-cols-3 gap-3">
         {Object.values(DISTANCE_RANGES).map((config) => {

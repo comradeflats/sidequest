@@ -53,7 +53,7 @@ export const DISTANCE_RANGES: Record<DistanceRange, DistanceRangeConfig> = {
     maxDistance: 1,
     avgDistance: 0.5,
     label: 'LOCAL',
-    description: '200m-1km stroll',
+    description: '200m-1km',
     radiusMeters: 1000
   },
   nearby: {
@@ -62,7 +62,7 @@ export const DISTANCE_RANGES: Record<DistanceRange, DistanceRangeConfig> = {
     maxDistance: 5,
     avgDistance: 3,
     label: 'NEARBY',
-    description: '1-5km walk',
+    description: '1-5km',
     radiusMeters: 5000
   },
   far: {
@@ -71,7 +71,7 @@ export const DISTANCE_RANGES: Record<DistanceRange, DistanceRangeConfig> = {
     maxDistance: 20,
     avgDistance: 12,
     label: 'FAR',
-    description: '5-20km expedition',
+    description: '5-20km',
     radiusMeters: 20000
   }
 };

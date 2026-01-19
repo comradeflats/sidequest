@@ -289,12 +289,13 @@ export default function Home() {
   ];
 
   const VERIFICATION_MESSAGES = [
-    "SCANNING VISUAL DATA...",
-    "ANALYZING COMPOSITION...",
-    "CHECKING QUEST CRITERIA...",
+    "PROCESSING YOUR SUBMISSION...",
+    "ANALYZING QUEST CRITERIA...",
     "CONSULTING THE AI ORACLE...",
-    "EVALUATING YOUR SUBMISSION...",
-    "CROSS-REFERENCING OBJECTIVES..."
+    "EVALUATING YOUR CAPTURE...",
+    "CROSS-REFERENCING OBJECTIVES...",
+    "VERIFYING COMPLETION...",
+    "RUNNING ANALYSIS..."
   ];
 
   const handleDeclineResume = async () => {
@@ -368,8 +369,18 @@ export default function Home() {
 
       console.log('[Verification] GPS for verification:', {
         fresh: !!freshGps,
-        coords: verificationGps ? `${verificationGps.lat.toFixed(6)}, ${verificationGps.lng.toFixed(6)}` : 'none',
+        userCoords: verificationGps ? `${verificationGps.lat.toFixed(6)}, ${verificationGps.lng.toFixed(6)}` : 'none',
         accuracy: verificationAccuracy ? `±${verificationAccuracy.toFixed(0)}m` : 'unknown'
+      });
+
+      // Debug logging for GPS distance bug investigation
+      console.log('[Verification] Quest coordinates check:', {
+        questId: currentQuest.id,
+        questTitle: currentQuest.title,
+        questCoords: currentQuest.coordinates
+          ? `${currentQuest.coordinates.lat.toFixed(6)}, ${currentQuest.coordinates.lng.toFixed(6)}`
+          : 'UNDEFINED - THIS IS THE BUG!',
+        hasCoordinates: !!currentQuest.coordinates
       });
 
       // Track verification attempt
@@ -735,7 +746,7 @@ export default function Home() {
                       <CheckCircle className="w-5 h-5 text-adventure-emerald flex-shrink-0 mt-0.5" />
                       <div className="flex-1">
                         <p className="text-xs font-pixel text-adventure-emerald mb-1">
-                          STARTING_LOCATION
+                          STARTING LOCATION
                         </p>
                         <p className="text-sm font-sans text-white">
                           {geocodedLocation.formattedAddress}
@@ -772,7 +783,7 @@ export default function Home() {
               {/* Campaign Type Selection */}
               <div className="space-y-3">
                 <label className="block text-xs font-pixel text-adventure-gold">
-                  CAMPAIGN_TYPE
+                  CAMPAIGN TYPE
                 </label>
                 <div className="grid grid-cols-2 gap-4">
                   <button
@@ -959,20 +970,22 @@ export default function Home() {
                         </div>
                       )}
 
-                      {/* Objective Box */}
+                      {/* Objective Box with Integrated Hint */}
                       <div className="bg-adventure-brown/20 border-2 border-adventure-brown rounded-lg p-4">
                         <p className="text-xs uppercase text-adventure-gold mb-1 font-pixel" style={{ fontSize: '0.6rem' }}>
                           OBJECTIVE
                         </p>
-                        <p className="text-sm font-sans text-white">
+                        <p className="text-sm font-sans text-white mb-3">
                           {currentQuest.objective}
                         </p>
-                      </div>
 
-                      {/* Location Hint */}
-                      <div className="pl-9 text-xs font-sans text-gray-400 italic">
-                        <MapPin className="w-3.5 h-3.5 inline mr-1" />
-                        {currentQuest.locationHint}
+                        {/* Hint inside the box */}
+                        <div className="flex items-start gap-2 pt-2 border-t border-adventure-brown/30">
+                          <MapPin className="w-3.5 h-3.5 text-gray-500 flex-shrink-0 mt-0.5" />
+                          <p className="text-xs font-sans text-gray-400 italic">
+                            {currentQuest.locationHint}
+                          </p>
+                        </div>
                       </div>
 
                       {/* Action Buttons */}
@@ -1039,6 +1052,23 @@ export default function Home() {
                             {permissionStatus === 'denied' && (
                               <div className="text-xs text-red-400 font-sans bg-red-500/10 rounded px-2 py-1">
                                 GPS access denied. Enable location in your browser settings.
+                              </div>
+                            )}
+                            {/* Live distance to target */}
+                            {userGps && currentQuest.coordinates && (
+                              <div className="text-xs text-gray-400 font-sans flex items-center gap-1.5 mt-1">
+                                <Navigation className="w-3 h-3" />
+                                <span>
+                                  Distance to target: {(() => {
+                                    const R = 6371;
+                                    const dLat = ((currentQuest.coordinates.lat - userGps.lat) * Math.PI) / 180;
+                                    const dLng = ((currentQuest.coordinates.lng - userGps.lng) * Math.PI) / 180;
+                                    const a = Math.sin(dLat / 2) ** 2 + Math.cos((userGps.lat * Math.PI) / 180) * Math.cos((currentQuest.coordinates.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+                                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                                    const distanceKm = R * c;
+                                    return distanceKm < 1 ? `${(distanceKm * 1000).toFixed(0)}m` : `${distanceKm.toFixed(2)}km`;
+                                  })()}
+                                </span>
                               </div>
                             )}
                           </div>

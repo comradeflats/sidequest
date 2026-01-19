@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 :root {
-  --background: #0a0a0a;
+  --background: #0f0d0a;
   --foreground: #ededed;
 
-  /* Adventure Color Palette */
-  --color-adventure-emerald: #10b981;
+  /* Adventure Color Palette - Warm Tones */
+  --color-adventure-emerald: #14b8a6;
   --color-adventure-gold: #fbbf24;
-  --color-adventure-brown: #8b7355;
+  --color-adventure-brown: #92400e;
   --color-adventure-sky: #60a5fa;
-  --color-adventure-purple: #a855f7;
+  --color-adventure-purple: #fb923c;
 }
 
 @theme inline {
@@ -19,12 +19,12 @@
   --font-mono: var(--font-geist-mono);
   --font-pixel: var(--font-pixel);
 
-  /* Adventure theme colors for Tailwind */
-  --color-adventure-emerald: #10b981;
+  /* Adventure theme colors for Tailwind - Warm Tones */
+  --color-adventure-emerald: #14b8a6;
   --color-adventure-gold: #fbbf24;
-  --color-adventure-brown: #8b7355;
+  --color-adventure-brown: #92400e;
   --color-adventure-sky: #60a5fa;
-  --color-adventure-purple: #a855f7;
+  --color-adventure-purple: #fb923c;
 }
 
 body {
@@ -40,31 +40,32 @@ body {
   image-rendering: crisp-edges;
 }
 
-/* Pixel Button Style */
+/* Pixel Button Style - Softened */
 .pixel-btn {
   position: relative;
-  border: 3px solid currentColor;
-  box-shadow: 4px 4px 0px 0px currentColor;
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  border: 2px solid currentColor;
+  box-shadow: 3px 3px 0px 0px rgba(0, 0, 0, 0.3);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
 .pixel-btn:hover {
   transform: translate(-1px, -1px);
-  box-shadow: 5px 5px 0px 0px currentColor;
+  box-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 0.25);
 }
 
 .pixel-btn:active {
-  transform: translate(2px, 2px);
-  box-shadow: 2px 2px 0px 0px currentColor;
+  transform: translate(1px, 1px);
+  box-shadow: 1px 1px 0px 0px rgba(0, 0, 0, 0.2);
 }
 
-/* Quest Card with Adventure Aesthetic */
+/* Quest Card with Adventure Aesthetic - Warmer */
 .quest-card {
-  background: linear-gradient(135deg, #1a1410 0%, #0a0a0a 100%);
-  border: 3px solid var(--color-adventure-brown);
+  background: linear-gradient(135deg, #1a1612 0%, #0f0d0a 100%);
+  border: 2px solid var(--color-adventure-brown);
+  border-radius: 12px;
   box-shadow:
-    0 8px 16px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+    0 8px 24px rgba(0, 0, 0, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   position: relative;
 }
 
@@ -112,23 +113,25 @@ body {
   clip-path: polygon(100% 0, 0 100%, 100% 100%);
 }
 
-/* Pixel Frame for Images */
+/* Pixel Frame for Images - Warmer */
 .pixel-frame {
-  border: 4px solid var(--color-adventure-gold);
+  border: 3px solid var(--color-adventure-gold);
+  border-radius: 8px;
   box-shadow:
-    0 0 20px rgba(16, 185, 129, 0.3),
-    inset 0 0 40px rgba(0, 0, 0, 0.2);
+    0 0 20px rgba(20, 184, 166, 0.2),
+    inset 0 0 40px rgba(0, 0, 0, 0.15);
   image-rendering: pixelated;
   position: relative;
 }
 
-/* Quest Image Hero */
+/* Quest Image Hero - Warmer */
 .quest-image-hero {
   aspect-ratio: 16 / 9;
-  border: 4px solid var(--color-adventure-gold);
+  border: 3px solid var(--color-adventure-gold);
+  border-radius: 8px;
   box-shadow:
-    0 0 20px rgba(16, 185, 129, 0.3),
-    inset 0 0 40px rgba(0, 0, 0, 0.2);
+    0 0 20px rgba(20, 184, 166, 0.2),
+    inset 0 0 40px rgba(0, 0, 0, 0.15);
   image-rendering: pixelated;
   position: relative;
 }
@@ -142,17 +145,17 @@ body {
   clip-path: polygon(0 0, 100% 0, 0 100%);
 }
 
-/* Pixel Shadow Utilities */
+/* Pixel Shadow Utilities - Softened */
 .shadow-pixel {
-  box-shadow: 4px 4px 0px 0px rgba(0, 0, 0, 0.25);
+  box-shadow: 3px 3px 8px rgba(0, 0, 0, 0.2);
 }
 
 .shadow-pixel-lg {
-  box-shadow: 6px 6px 0px 0px rgba(0, 0, 0, 0.3);
+  box-shadow: 4px 4px 12px rgba(0, 0, 0, 0.25);
 }
 
 .shadow-pixel-inset {
-  box-shadow: inset 4px 4px 0px 0px rgba(255, 255, 255, 0.1);
+  box-shadow: inset 2px 2px 4px rgba(255, 255, 255, 0.05);
 }
 
 /* Pixel Font Utility */
@@ -195,30 +198,5 @@ body {
 .border-adventure-sky { border-color: var(--color-adventure-sky); }
 .border-adventure-purple { border-color: var(--color-adventure-purple); }
 
-/* Scanline Effect (subtle) */
-@keyframes scanline {
-  0% { transform: translateY(-100%); }
-  100% { transform: translateY(100%); }
-}
-
-.scanlines {
-  position: relative;
-  overflow: hidden;
-}
-
-.scanlines::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(
-    to bottom,
-    transparent 50%,
-    rgba(0, 0, 0, 0.05) 50%
-  );
-  background-size: 100% 4px;
-  pointer-events: none;
-  z-index: 10;
-}
+/* Scanline Effect - REMOVED for warmer aesthetic */
+/* The terminal/CRT look has been replaced with a softer adventure theme */

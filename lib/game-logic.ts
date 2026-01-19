@@ -17,10 +17,41 @@ function buildQuestTypeInstructions(enableVideo: boolean, enableAudio: boolean, 
     - 1 VIDEO quest (questType: "VIDEO", mediaRequirements: { minDuration: 5, maxDuration: 30, description: "5-30 second video" })
     - 1 AUDIO quest (questType: "AUDIO", mediaRequirements: { minDuration: 10, maxDuration: 60, description: "10-60 second recording" })
 
-    Assign quest types strategically based on which location best fits each type:
-    - PHOTO: Best for landmarks, signs, statues, building facades, specific visual details
-    - VIDEO: Best for fountains, waterfalls, street performers, busy intersections, moving sculptures
-    - AUDIO: Best for markets, train stations, busy streets, nature areas, unique soundscapes
+    CRITICAL - QUEST SPECIFICITY REQUIREMENTS:
+    All objectives MUST be specific and AI-verifiable. Vague objectives are NOT acceptable.
+
+    VIDEO QUESTS - REQUIRE SPECIFIC VISIBLE ACTIONS:
+    GOOD examples (specific, verifiable):
+    - "Record surfers catching a wave at the beach"
+    - "Capture a train arriving at the platform"
+    - "Film the fountain's water jets cycling through their pattern"
+    - "Record pigeons taking off from the plaza"
+    - "Capture pedestrians crossing at the busy intersection"
+    BAD examples (too vague, easy to fake):
+    - "Record the area" ❌
+    - "Film the scenery" ❌
+    - "Capture the location" ❌
+
+    AUDIO QUESTS - REQUIRE SPECIFIC IDENTIFIABLE SOUNDS:
+    GOOD examples (specific, verifiable):
+    - "Record the church bells ringing"
+    - "Capture the sound of seagulls at the harbor"
+    - "Record the espresso machine hissing and café chatter"
+    - "Capture the train announcement over the PA system"
+    - "Record street musicians performing"
+    BAD examples (too vague, easy to fake):
+    - "Record ambient sounds" ❌
+    - "Capture the atmosphere" ❌
+    - "Record background noise" ❌
+
+    PHOTO QUESTS - REQUIRE SPECIFIC VISUAL ELEMENTS:
+    - Must reference identifiable landmarks, signs, architectural features
+    - Should be clearly verifiable by AI vision analysis
+
+    IMPORTANT GUIDELINES:
+    - Objectives should showcase Gemini's multimodal understanding capabilities
+    - Quests must be non-intrusive (NO photographing strangers' faces, NO entering private spaces)
+    - The AI must be able to definitively verify the submission matches the objective
 
     The order of quests should follow the natural route, not be grouped by type.
     `;
@@ -31,7 +62,7 @@ function buildQuestTypeInstructions(enableVideo: boolean, enableAudio: boolean, 
     QUEST TYPES:
     - All quests should be PHOTO quests (questType: "PHOTO")
     - mediaRequirements should be null for PHOTO quests
-    - Objectives should describe what to photograph
+    - Objectives should describe specific visual elements to photograph (not vague like "capture the area")
     `;
   }
 
@@ -42,6 +73,9 @@ function buildQuestTypeInstructions(enableVideo: boolean, enableAudio: boolean, 
   let instructions = `
     QUEST TYPES ENABLED: ${availableTypes.join(', ')}
 
+    CRITICAL - ALL OBJECTIVES MUST BE SPECIFIC AND AI-VERIFIABLE:
+    Avoid vague objectives like "record the area" or "capture ambient sounds" - these are too easy to fake!
+
     You should assign quest types strategically based on what makes sense for each location:
     `;
 
@@ -49,8 +83,9 @@ function buildQuestTypeInstructions(enableVideo: boolean, enableAudio: boolean, 
     instructions += `
     VIDEO QUESTS (questType: "VIDEO"):
     - Best for: Fountains, waterfalls, street performers, busy intersections, moving sculptures
-    - Objective should describe what to record (motion, activity, panning shot)
-    - Example objectives: "Record 10 seconds of the fountain in motion", "Pan across the plaza architecture"
+    - Objective MUST describe specific visible motion/action to capture
+    - GOOD: "Record surfers catching a wave", "Capture the fountain jets cycling", "Film a train arriving"
+    - BAD: "Record the area", "Film the scenery" (too vague!)
     - mediaRequirements: { minDuration: 5, maxDuration: 30, description: "5-30 second video" }
     `;
   }
@@ -59,8 +94,9 @@ function buildQuestTypeInstructions(enableVideo: boolean, enableAudio: boolean, 
     instructions += `
     AUDIO QUESTS (questType: "AUDIO"):
     - Best for: Markets, train stations, busy streets, nature areas, unique soundscapes
-    - Objective should describe what sounds to capture or ask for a verbal description
-    - Example objectives: "Record 30 seconds of ambient market sounds", "Describe what you see in 30 seconds"
+    - Objective MUST describe specific identifiable sounds to capture
+    - GOOD: "Record church bells ringing", "Capture seagulls at the harbor", "Record the espresso machine"
+    - BAD: "Record ambient sounds", "Capture the atmosphere" (too vague!)
     - mediaRequirements: { minDuration: 10, maxDuration: 60, description: "10-60 second recording" }
     `;
   }
@@ -74,6 +110,8 @@ function buildQuestTypeInstructions(enableVideo: boolean, enableAudio: boolean, 
     - Mix quest types naturally based on location suitability
     - Ensure at least one PHOTO quest for accessibility
     - Don't force a quest type if it doesn't fit the location
+
+    REMEMBER: All quests must be non-intrusive (no photographing strangers, no entering private spaces)
     `;
 
   return instructions;

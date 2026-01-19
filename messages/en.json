@@ -7,23 +7,23 @@
     "locationLabel": "LOCATION",
     "locationPlaceholder": "Enter city or street address",
     "locationHint": "You can enter a full street address or just a city",
-    "startingLocation": "STARTING_LOCATION",
+    "startingLocation": "STARTING LOCATION",
     "changeButton": "CHANGE",
     "goButton": "GO",
-    "campaignType": "CAMPAIGN_TYPE",
+    "campaignType": "CAMPAIGN TYPE",
     "quickHunt": "QUICK HUNT",
     "quickHuntDesc": "2-3 quests",
     "cityOdyssey": "CITY ODYSSEY",
     "cityOdysseyDesc": "4-5 quests",
-    "distanceRange": "SELECT_DISTANCE_RANGE"
+    "distanceRange": "RANGE"
   },
   "distances": {
     "nearbyLabel": "NEARBY",
-    "nearbyDesc": "0.5-3km walks",
+    "nearbyDesc": "1-5km",
     "mediumLabel": "MEDIUM",
-    "mediumDesc": "3-10km journey",
+    "mediumDesc": "3-10km",
     "farLabel": "FAR",
-    "farDesc": "10-30km expedition"
+    "farDesc": "5-20km"
   },
   "quest": {
     "objective": "OBJECTIVE",
@@ -41,7 +41,7 @@
   "appeal": {
     "title": "APPEAL VERIFICATION",
     "subtitle": "Explain what you found. The AI will reconsider.",
-    "yourExplanation": "YOUR_EXPLANATION",
+    "yourExplanation": "YOUR EXPLANATION",
     "placeholder": "e.g., 'The lifeguard station here is green and yellow, not blue and yellow'",
     "submitAppeal": "SUBMIT APPEAL",
     "appealToJudge": "APPEAL TO AI JUDGE",
@@ -67,7 +67,7 @@
     "distance": "km"
   },
   "journey": {
-    "tracker": "JOURNEY_TRACKER",
+    "tracker": "JOURNEY TRACKER",
     "continue": "CONTINUE YOUR ADVENTURE?",
     "resume": "RESUME",
     "startNew": "START NEW",
