@@ -38,7 +38,7 @@ export default function DistanceRangeSelector({ selectedRange, onSelect }: Props
                 relative p-4 rounded-xl transition-all
                 ${
                   isSelected
-                    ? 'bg-adventure-gold/20 border-3 border-adventure-gold shadow-pixel'
+                    ? 'bg-adventure-gold/20 border-2 border-adventure-gold'
                     : 'bg-zinc-900 border-2 border-adventure-brown hover:border-adventure-emerald'
                 }
               `}
@@ -61,28 +61,6 @@ export default function DistanceRangeSelector({ selectedRange, onSelect }: Props
               <div className="text-xs text-gray-400 font-sans">
                 {config.description}
               </div>
-
-              {/* Selection checkmark */}
-              {isSelected && (
-                <motion.div
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="absolute -top-2 -right-2 w-6 h-6 bg-adventure-gold rounded-full flex items-center justify-center border-2 border-black"
-                >
-                  <span className="text-black text-xs font-bold">✓</span>
-                </motion.div>
-              )}
-
-              {/* Corner ornaments for selected range */}
-              {isSelected && (
-                <>
-                  <div className="corner-ornament" style={{ top: '-3px', left: '-3px' }} />
-                  <div
-                    className="corner-ornament"
-                    style={{ top: '-3px', right: '-3px', clipPath: 'polygon(0 0, 100% 0, 100% 100%)' }}
-                  />
-                </>
-              )}
             </motion.button>
           );
         })}
