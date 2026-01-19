@@ -288,6 +288,7 @@ export default function MediaScanner({
           <>
             <Webcam
               audio={questType === 'VIDEO'}
+              muted={true}
               ref={webcamRef}
               screenshotFormat="image/jpeg"
               videoConstraints={{

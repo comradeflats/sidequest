@@ -117,7 +117,7 @@ export default function ThinkingPanel({
                     </div>
 
                     {/* Observation */}
-                    <p className="text-xs text-gray-400 font-sans italic ml-6 mb-2">
+                    <p className="text-xs text-gray-400 font-sans italic ml-6 mb-2 break-words">
                       &ldquo;{step.observation}&rdquo;
                     </p>
 
