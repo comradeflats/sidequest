@@ -792,7 +792,7 @@ export default function Home() {
                     disabled={isLoading || !geocodedLocation || !distanceRange}
                     className="pixel-btn flex flex-col items-center justify-center p-6 rounded-xl transition-all disabled:opacity-40 disabled:cursor-not-allowed group bg-zinc-900 border-adventure-purple text-adventure-purple hover:bg-adventure-purple/10 disabled:hover:bg-zinc-900"
                   >
-                    <Map className="w-8 h-8 mb-3 group-hover:scale-110 transition-transform" />
+                    <Compass className="w-8 h-8 mb-3 group-hover:scale-110 transition-transform" />
                     <span className="text-sm font-bold font-pixel" style={{ fontSize: '0.7rem' }}>
                       CITY ODYSSEY
                     </span>

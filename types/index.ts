@@ -59,20 +59,20 @@ export const DISTANCE_RANGES: Record<DistanceRange, DistanceRangeConfig> = {
   nearby: {
     range: 'nearby',
     minDistance: 1,
-    maxDistance: 8,
-    avgDistance: 4,
+    maxDistance: 5,
+    avgDistance: 3,
     label: 'NEARBY',
-    description: '1-8km walk',
-    radiusMeters: 8000
+    description: '1-5km walk',
+    radiusMeters: 5000
   },
   far: {
     range: 'far',
-    minDistance: 10,
-    maxDistance: 30,
-    avgDistance: 18,
+    minDistance: 5,
+    maxDistance: 20,
+    avgDistance: 12,
     label: 'FAR',
-    description: '10-30km expedition',
-    radiusMeters: 30000
+    description: '5-20km expedition',
+    radiusMeters: 20000
   }
 };
 
