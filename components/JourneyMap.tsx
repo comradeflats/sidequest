@@ -44,13 +44,25 @@ export default function JourneyMap({
 
     let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=walking`;
 
-    // Add middle quests as waypoints
-    if (questsWithCoords.length > 2) {
-      const middleQuests = questsWithCoords.slice(1, -1);
-      const waypoints = middleQuests
-        .map(q => `${q.coordinates!.lat},${q.coordinates!.lng}`)
-        .join('|');
-      url += `&waypoints=${waypoints}`;
+    // Add waypoints - include all quests except the destination
+    if (campaignStartLocation) {
+      // When we have a start location, all quests except the last are waypoints
+      const waypointQuests = questsWithCoords.slice(0, -1);
+      if (waypointQuests.length > 0) {
+        const waypoints = waypointQuests
+          .map(q => `${q.coordinates!.lat},${q.coordinates!.lng}`)
+          .join('|');
+        url += `&waypoints=${waypoints}`;
+      }
+    } else {
+      // When first quest is origin, middle quests are waypoints
+      if (questsWithCoords.length > 2) {
+        const middleQuests = questsWithCoords.slice(1, -1);
+        const waypoints = middleQuests
+          .map(q => `${q.coordinates!.lat},${q.coordinates!.lng}`)
+          .join('|');
+        url += `&waypoints=${waypoints}`;
+      }
     }
 
     return url;
@@ -85,21 +97,21 @@ export default function JourneyMap({
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center">
               <TrendingUp className="w-5 h-5 text-adventure-emerald mx-auto mb-1" />
-              <p className="text-2xl font-pixel text-white">
+              <p className="text-2xl font-mono tabular-nums text-white">
                 {journeyStats.totalDistanceTraveled.toFixed(2)}
               </p>
               <p className="text-xs text-gray-400 font-sans">km traveled</p>
             </div>
             <div className="text-center">
               <Clock className="w-5 h-5 text-adventure-sky mx-auto mb-1" />
-              <p className="text-2xl font-pixel text-white">
+              <p className="text-2xl font-mono tabular-nums text-white">
                 {journeyStats.durationMinutes}
               </p>
               <p className="text-xs text-gray-400 font-sans">minutes</p>
             </div>
             <div className="text-center">
               <MapIcon className="w-5 h-5 text-adventure-gold mx-auto mb-1" />
-              <p className="text-2xl font-pixel text-white">
+              <p className="text-2xl font-mono tabular-nums text-white">
                 {quests.length}
               </p>
               <p className="text-xs text-gray-400 font-sans">quests</p>

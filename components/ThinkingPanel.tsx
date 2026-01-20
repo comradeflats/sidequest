@@ -157,7 +157,7 @@ export default function ThinkingPanel({
               {/* Overall Confidence Footer */}
               <div className={`px-4 py-3 border-t border-zinc-700 ${success ? 'bg-adventure-emerald/10' : 'bg-red-500/10'}`}>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-xs font-pixel text-gray-400 flex-shrink-0">
+                  <span className="text-xs font-pixel text-gray-400 min-w-0 truncate">
                     OVERALL CONFIDENCE
                   </span>
                   <div className="flex items-center gap-2 flex-shrink-0">
