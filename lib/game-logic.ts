@@ -129,9 +129,7 @@ export async function generateCampaign(
   const questCount = type === 'short' ? 3 : 5;
 
   // STEP 1: Geocode the starting location
-  console.log('[SideQuest] Geocoding location:', location);
   const locationData = await geocodeLocation(location);
-  console.log('[SideQuest] Coordinates:', locationData.coordinates);
 
   // STEP 2: Get quest locations using Places API (with fallback to random coordinates)
   const questLocations = await getQuestLocations(
@@ -139,7 +137,6 @@ export async function generateCampaign(
     distanceRange,
     questCount
   );
-  console.log('[SideQuest] Retrieved quest locations for', distanceRange, 'range');
 
   // Extract coordinates from quest locations (whether PlaceData or Coordinates)
   const questCoords: Coordinates[] = questLocations.map((loc) =>
@@ -161,10 +158,6 @@ export async function generateCampaign(
 
   const totalDistance = distances.reduce((sum, d) => sum + d, 0);
   const totalTime = durations.reduce((sum, d) => sum + d, 0);
-
-  console.log(
-    `[SideQuest] Total campaign: ${totalDistance.toFixed(1)}km, ~${totalTime} minutes walking`
-  );
 
   // STEP 4: Generate campaign with Gemini AI using real places
   const model = getModel('campaign');
@@ -271,7 +264,6 @@ export async function generateCampaign(
     });
 
     // STEP 6: Generate images for all quests in parallel
-    console.log('[SideQuest] Generating quest images...');
     const questsWithImages = await Promise.all(
       questsWithMetadata.map(async (quest: Quest) => {
         const imageUrl = await generateQuestImage(quest);
@@ -295,8 +287,7 @@ export async function generateCampaign(
       enableAudioQuests,
       guaranteedMix,
     };
-  } catch (error) {
-    console.error('[SideQuest] Failed to parse campaign JSON:', text);
+  } catch {
     throw new Error('Failed to generate valid campaign JSON');
   }
 }
@@ -374,11 +365,6 @@ export async function verifyPhoto(
     const distanceData = calculateStraightLineDistance(userGps, targetGps);
     distanceFromTarget = distanceData.distanceMeters;
     gpsConfidence = calculateGpsConfidence(distanceFromTarget, gpsAccuracy);
-    console.log('[Verification] GPS boost check:', {
-      distance: `${distanceFromTarget.toFixed(0)}m`,
-      accuracy: gpsAccuracy ? `±${gpsAccuracy.toFixed(0)}m` : 'unknown',
-      confidence: gpsConfidence.toFixed(2)
-    });
   }
 
   // Build GPS context for prompt if user is close to target
@@ -445,8 +431,7 @@ export async function verifyPhoto(
       distanceFromTarget,
       mediaType: 'photo'
     };
-  } catch (error) {
-    console.error('[SideQuest] Failed to parse photo verification JSON:', text);
+  } catch {
     throw new Error('Failed to verify photo - invalid JSON response');
   }
 }
@@ -528,8 +513,7 @@ export async function verifyPhotoWithAppeal(
 
   try {
     return JSON.parse(text);
-  } catch (error) {
-    console.error('[SideQuest] Failed to parse appeal verification JSON:', text);
+  } catch {
     throw new Error('Failed to verify appeal - invalid JSON response');
   }
 }
@@ -559,11 +543,6 @@ export async function verifyVideo(
     const distanceData = calculateStraightLineDistance(userGps, targetGps);
     distanceFromTarget = distanceData.distanceMeters;
     gpsConfidence = calculateGpsConfidence(distanceFromTarget, gpsAccuracy);
-    console.log('[Verification] GPS boost check (video):', {
-      distance: `${distanceFromTarget.toFixed(0)}m`,
-      accuracy: gpsAccuracy ? `±${gpsAccuracy.toFixed(0)}m` : 'unknown',
-      confidence: gpsConfidence.toFixed(2)
-    });
   }
 
   // Build GPS context for prompt if user is close to target
@@ -657,8 +636,7 @@ export async function verifyVideo(
       distanceFromTarget,
       mediaType: 'video'
     };
-  } catch (error) {
-    console.error('[SideQuest] Failed to parse video verification JSON:', text);
+  } catch {
     throw new Error('Failed to verify video - invalid JSON response');
   }
 }
@@ -688,11 +666,6 @@ export async function verifyAudio(
     const distanceData = calculateStraightLineDistance(userGps, targetGps);
     distanceFromTarget = distanceData.distanceMeters;
     gpsConfidence = calculateGpsConfidence(distanceFromTarget, gpsAccuracy);
-    console.log('[Verification] GPS boost check (audio):', {
-      distance: `${distanceFromTarget.toFixed(0)}m`,
-      accuracy: gpsAccuracy ? `±${gpsAccuracy.toFixed(0)}m` : 'unknown',
-      confidence: gpsConfidence.toFixed(2)
-    });
   }
 
   // Build GPS context for prompt if user is close to target
@@ -786,8 +759,7 @@ export async function verifyAudio(
       distanceFromTarget,
       mediaType: 'audio'
     };
-  } catch (error) {
-    console.error('[SideQuest] Failed to parse audio verification JSON:', text);
+  } catch {
     throw new Error('Failed to verify audio - invalid JSON response');
   }
 }
@@ -953,8 +925,7 @@ export async function verifyMediaWithAppeal(
 
   try {
     return JSON.parse(text);
-  } catch (error) {
-    console.error('[SideQuest] Failed to parse media appeal verification JSON:', text);
+  } catch {
     throw new Error('Failed to verify appeal - invalid JSON response');
   }
 }

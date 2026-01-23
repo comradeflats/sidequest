@@ -40,20 +40,14 @@ export const trackEvent = (event: AnalyticsEvent) => {
 
   // Check if GA is initialized
   if (!window.gtag) {
-    console.warn('[Analytics] GA4 not initialized - skipping event:', event.name);
     return;
   }
 
   try {
     // Send event to GA4
     window.gtag('event', event.name, event.params);
-
-    // Log to console in development
-    if (process.env.NODE_ENV === 'development') {
-      console.log('[Analytics]', event.name, event.params);
-    }
-  } catch (error) {
-    console.error('[Analytics] Failed to track event:', event.name, error);
+  } catch {
+    // Analytics tracking failed silently
   }
 };
 

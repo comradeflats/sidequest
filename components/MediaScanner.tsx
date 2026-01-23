@@ -192,8 +192,7 @@ export default function MediaScanner({
 
       mediaRecorder.start(1000); // Collect data every second
       setIsRecording(true);
-    } catch (error) {
-      console.error('Failed to start recording:', error);
+    } catch {
       alert('Could not access camera/microphone. Please check permissions.');
     }
   }, [questType, facingMode, onCapture]);

@@ -21,8 +21,7 @@ export async function POST(request: Request) {
     const data = await response.json();
 
     return NextResponse.json(data);
-  } catch (error) {
-    console.error('Distance matrix proxy error:', error);
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch distance' }, { status: 500 });
   }
 }

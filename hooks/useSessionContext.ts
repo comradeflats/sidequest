@@ -70,16 +70,11 @@ export function useSessionContext({
       for (const attempt of existingContext.questHistory) {
         currentAttempts.current[attempt.questId] = attempt.attempts;
       }
-      console.log('[useSessionContext] Loaded existing context:', {
-        questsCompleted: existingContext.questHistory.length,
-        successRate: existingContext.patterns.successRate
-      });
     } else {
       // Create new context
       const newContext = createSessionContext(campaignId);
       setContext(newContext);
       saveSessionContext(newContext);
-      console.log('[useSessionContext] Created new context for campaign:', campaignId);
     }
 
     setIsLoaded(true);
@@ -96,7 +91,6 @@ export function useSessionContext({
   const startAttempt = useCallback((questId: string) => {
     currentAttempts.current[questId] = (currentAttempts.current[questId] || 0) + 1;
     attemptStartTimes.current[questId] = Date.now();
-    console.log('[useSessionContext] Started attempt', currentAttempts.current[questId], 'for quest:', questId);
   }, []);
 
   // Record a quest attempt result
@@ -144,13 +138,6 @@ export function useSessionContext({
 
     const updatedContext = updateSessionContext(context, attempt);
     setContext(updatedContext);
-
-    console.log('[useSessionContext] Recorded attempt:', {
-      questId,
-      success,
-      attempts: attempt.attempts,
-      totalQuests: updatedContext.questHistory.length
-    });
   }, [context]);
 
   // Get context prompt for AI

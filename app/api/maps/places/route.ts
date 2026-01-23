@@ -69,19 +69,8 @@ export async function POST(request: Request) {
 
     const data = await response.json();
 
-    // Log for debugging
-    console.log('[SideQuest] Places API response status:', response.status);
-
-    // Log error details if request failed
-    if (!response.ok) {
-      console.error('[SideQuest] Places API error response:', JSON.stringify(data, null, 2));
-    } else {
-      console.log('[SideQuest] Places found:', data.places?.length || 0);
-    }
-
     return NextResponse.json(data);
-  } catch (error) {
-    console.error('[SideQuest] Places API error:', error);
+  } catch {
     return NextResponse.json({ error: 'Failed to fetch places' }, { status: 500 });
   }
 }

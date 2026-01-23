@@ -56,7 +56,7 @@ export interface SessionContext {
 }
 
 // Storage key prefix
-const SESSION_CONTEXT_KEY = 'geoseeker_session_context_';
+const SESSION_CONTEXT_KEY = 'sidequest_session_context_';
 
 /**
  * Generate a unique session ID
@@ -388,9 +388,8 @@ export function saveSessionContext(ctx: SessionContext): void {
   try {
     const key = SESSION_CONTEXT_KEY + ctx.campaignId;
     localStorage.setItem(key, JSON.stringify(ctx));
-    console.log('[SessionContext] Saved context for campaign:', ctx.campaignId);
-  } catch (error) {
-    console.error('[SessionContext] Failed to save context:', error);
+  } catch {
+    // Failed to save context
   }
 }
 
@@ -402,12 +401,10 @@ export function loadSessionContext(campaignId: string): SessionContext | null {
     const key = SESSION_CONTEXT_KEY + campaignId;
     const stored = localStorage.getItem(key);
     if (stored) {
-      const ctx = JSON.parse(stored) as SessionContext;
-      console.log('[SessionContext] Loaded context for campaign:', campaignId);
-      return ctx;
+      return JSON.parse(stored) as SessionContext;
     }
-  } catch (error) {
-    console.error('[SessionContext] Failed to load context:', error);
+  } catch {
+    // Failed to load context
   }
   return null;
 }
@@ -419,8 +416,7 @@ export function clearSessionContext(campaignId: string): void {
   try {
     const key = SESSION_CONTEXT_KEY + campaignId;
     localStorage.removeItem(key);
-    console.log('[SessionContext] Cleared context for campaign:', campaignId);
-  } catch (error) {
-    console.error('[SessionContext] Failed to clear context:', error);
+  } catch {
+    // Failed to clear context
   }
 }

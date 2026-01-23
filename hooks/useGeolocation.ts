@@ -113,11 +113,6 @@ export function useGeolocation(enableTracking: boolean = false): UseGeolocationR
             isRefreshing: false,
             permissionStatus: 'granted'
           }));
-          console.log('[GPS] Refreshed location:', {
-            lat: coords.lat.toFixed(6),
-            lng: coords.lng.toFixed(6),
-            accuracy: position.coords.accuracy.toFixed(0)
-          });
           resolve(coords);
         },
         (error) => {
@@ -127,7 +122,6 @@ export function useGeolocation(enableTracking: boolean = false): UseGeolocationR
             isRefreshing: false,
             permissionStatus: error.code === error.PERMISSION_DENIED ? 'denied' : prev.permissionStatus
           }));
-          console.error('[GPS] Refresh failed:', error.message);
           resolve(null);
         },
         {

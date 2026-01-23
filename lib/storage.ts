@@ -32,16 +32,12 @@ export async function saveCampaign(
   },
   journeyStats?: JourneyStats
 ): Promise<void> {
-  // Debug: Check if campaign has images
-  const questsWithImages = campaign.quests.filter(q => q.imageUrl);
-  console.log(`[Storage] Campaign has ${questsWithImages.length}/${campaign.quests.length} quests with images`);
-
   // Save images to IndexedDB (if available)
   if (isIndexedDBAvailable()) {
     try {
       await saveCampaignImages(campaign.id, campaign.quests);
-    } catch (error) {
-      console.warn('[Storage] Failed to save images to IndexedDB:', error);
+    } catch {
+      // IndexedDB save failed, images will be regenerated on next load
     }
   }
 
@@ -83,14 +79,10 @@ function saveToLocalStorage(
       journeyStats
     };
 
-    const dataSize = JSON.stringify(stored).length;
-    console.log(`[Storage] Data size: ${(dataSize / 1024).toFixed(1)} KB`);
-
     localStorage.setItem(`campaign_${campaign.id}`, JSON.stringify(stored));
     localStorage.setItem(CURRENT_CAMPAIGN_KEY, campaign.id);
-    console.log(`[Storage] Saved campaign ${campaign.id} at quest ${progress.currentQuestIndex}`);
-  } catch (error) {
-    console.error('[Storage] Failed to save campaign:', error);
+  } catch {
+    // Failed to save campaign to localStorage
   }
 }
 
@@ -117,10 +109,8 @@ export async function loadCampaign(campaignId: string): Promise<StoredCampaign |
         }
       }
 
-      const imagesLoaded = Object.keys(images).length;
-      console.log(`[Storage] Loaded campaign ${campaignId} with ${imagesLoaded}/${questIds.length} images from IndexedDB`);
-    } catch (error) {
-      console.warn('[Storage] Failed to load images from IndexedDB:', error);
+    } catch {
+      // Failed to load images from IndexedDB, they will be regenerated
     }
   }
 
@@ -134,11 +124,8 @@ function loadFromLocalStorage(campaignId: string): StoredCampaign | null {
   try {
     const data = localStorage.getItem(`campaign_${campaignId}`);
     if (!data) {
-      console.log(`[Storage] No campaign found with id ${campaignId}`);
       return null;
     }
-
-    console.log(`[Storage] Loading campaign from localStorage, data size: ${(data.length / 1024).toFixed(1)} KB`);
 
     const stored: StoredCampaign = JSON.parse(data);
 
@@ -162,8 +149,7 @@ function loadFromLocalStorage(campaignId: string): StoredCampaign | null {
     }
 
     return stored;
-  } catch (error) {
-    console.error('[Storage] Failed to load campaign:', error);
+  } catch {
     return null;
   }
 }
@@ -180,7 +166,6 @@ export async function getCurrentCampaignId(): Promise<string | null> {
  */
 export async function clearCurrentCampaign(): Promise<void> {
   localStorage.removeItem(CURRENT_CAMPAIGN_KEY);
-  console.log('[Storage] Cleared current campaign');
 }
 
 /**
@@ -192,10 +177,9 @@ export async function markCampaignComplete(campaignId: string): Promise<void> {
     if (stored) {
       stored.completedAt = new Date();
       localStorage.setItem(`campaign_${campaignId}`, JSON.stringify(stored));
-      console.log(`[Storage] Marked campaign ${campaignId} as complete`);
     }
-  } catch (error) {
-    console.error('[Storage] Failed to mark campaign complete:', error);
+  } catch {
+    // Failed to mark campaign complete
   }
 }
 
@@ -219,9 +203,8 @@ export function addToHistory(campaignId: string): void {
     }
 
     localStorage.setItem(CAMPAIGN_HISTORY_KEY, JSON.stringify(history));
-    console.log(`[Storage] Added campaign ${campaignId} to history`);
-  } catch (error) {
-    console.error('[Storage] Failed to add to history:', error);
+  } catch {
+    // Failed to add to history
   }
 }
 
@@ -244,8 +227,7 @@ export async function getCampaignHistory(): Promise<StoredCampaign[]> {
     }
 
     return campaigns;
-  } catch (error) {
-    console.error('[Storage] Failed to get campaign history:', error);
+  } catch {
     return [];
   }
 }
@@ -258,8 +240,8 @@ export async function deleteCampaign(campaignId: string): Promise<void> {
   if (isIndexedDBAvailable()) {
     try {
       await deleteImagesForCampaign(campaignId);
-    } catch (error) {
-      console.warn('[Storage] Failed to delete images from IndexedDB:', error);
+    } catch {
+      // Failed to delete images from IndexedDB
     }
   }
 
@@ -267,9 +249,8 @@ export async function deleteCampaign(campaignId: string): Promise<void> {
   try {
     localStorage.removeItem(`campaign_${campaignId}`);
     localStorage.removeItem(`journey_${campaignId}`);
-    console.log(`[Storage] Deleted campaign ${campaignId}`);
-  } catch (error) {
-    console.error('[Storage] Failed to delete campaign:', error);
+  } catch {
+    // Failed to delete campaign
   }
 }
 
@@ -315,9 +296,8 @@ export function clearAllData(): void {
     }
 
     keys.forEach(key => localStorage.removeItem(key));
-    console.log(`[Storage] Cleared all SideQuest data (${keys.length} items)`);
-  } catch (error) {
-    console.error('[Storage] Failed to clear all data:', error);
+  } catch {
+    // Failed to clear all data
   }
 }
 
@@ -347,8 +327,8 @@ export function getPlayerProgress(): PlayerProgress {
       progress.level = calculateLevel(progress.totalXP);
       return progress;
     }
-  } catch (error) {
-    console.error('[Storage] Failed to load player progress:', error);
+  } catch {
+    // Failed to load player progress
   }
 
   // Default progress
@@ -372,14 +352,8 @@ export function addXP(amount: number): PlayerProgress {
 
   try {
     localStorage.setItem(PLAYER_PROGRESS_KEY, JSON.stringify(current));
-    console.log(`[Storage] Added ${amount} XP. Total: ${current.totalXP}, Level: ${current.level}`);
-
-    // Check for level up
-    if (current.level > previousLevel) {
-      console.log(`[Storage] LEVEL UP! ${previousLevel} -> ${current.level}`);
-    }
-  } catch (error) {
-    console.error('[Storage] Failed to save player progress:', error);
+  } catch {
+    // Failed to save player progress
   }
 
   return current;
@@ -417,8 +391,8 @@ export function getQuestTypePreferences(): QuestTypePreferences {
     if (data) {
       return JSON.parse(data);
     }
-  } catch (error) {
-    console.error('[Storage] Failed to load quest type preferences:', error);
+  } catch {
+    // Failed to load quest type preferences
   }
 
   // Default: video, audio, and guaranteed mix disabled
@@ -435,9 +409,8 @@ export function getQuestTypePreferences(): QuestTypePreferences {
 export function saveQuestTypePreferences(preferences: QuestTypePreferences): void {
   try {
     localStorage.setItem(QUEST_PREFERENCES_KEY, JSON.stringify(preferences));
-    console.log('[Storage] Saved quest type preferences:', preferences);
-  } catch (error) {
-    console.error('[Storage] Failed to save quest type preferences:', error);
+  } catch {
+    // Failed to save quest type preferences
   }
 }
 

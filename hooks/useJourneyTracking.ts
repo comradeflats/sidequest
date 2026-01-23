@@ -83,7 +83,6 @@ export function useJourneyTracking({
 
     // Ignore points with poor accuracy
     if (accuracy > MAX_ACCURACY_METERS) {
-      console.log('[Journey] Ignoring point with poor accuracy:', accuracy);
       return;
     }
 
@@ -130,12 +129,6 @@ export function useJourneyTracking({
         if (onJourneyUpdate) {
           onJourneyUpdate(updatedStats);
         }
-
-        console.log('[Journey] Point recorded:', {
-          distance: distanceMoved.toFixed(1),
-          totalKm: newTotalDistance.toFixed(2),
-          points: updatedStats.pathPoints.length
-        });
       }
     }
 
@@ -203,11 +196,6 @@ export function useJourneyTracking({
       lastRecordedTime.current = new Date(lastPoint.timestamp).getTime();
     }
     hasInitialized.current = true;
-    console.log('[Journey] Restored stats from save:', {
-      totalKm: stats.totalDistanceTraveled.toFixed(2),
-      points: stats.pathPoints.length,
-      duration: stats.durationMinutes
-    });
   }, []);
 
   return {

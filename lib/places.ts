@@ -53,14 +53,12 @@ export async function findNearbyPlaces(
     });
 
     if (!response.ok) {
-      console.warn('[SideQuest] Places API request failed:', response.status);
       return [];
     }
 
     const data = await response.json();
 
     if (!data.places || data.places.length === 0) {
-      console.warn('[SideQuest] No places found near location');
       return [];
     }
 
@@ -76,10 +74,8 @@ export async function findNearbyPlaces(
       placeId: place.id || ''
     }));
 
-    console.log(`[SideQuest] Found ${places.length} places via Places API`);
     return places;
-  } catch (error) {
-    console.error('[SideQuest] Places API error:', error);
+  } catch {
     return [];
   }
 }
@@ -122,10 +118,7 @@ export function selectQuestPlaces(
     return distanceFromStart <= config.maxDistance;
   });
 
-  console.log(`[SideQuest] ${placesWithinRadius.length}/${places.length} places within ${config.maxDistance}km radius`);
-
   if (placesWithinRadius.length === 0) {
-    console.warn('[SideQuest] No places within radius, using all places');
     // Fall back to all places if none are within radius
     return places.slice(0, count);
   }
@@ -208,7 +201,6 @@ export function selectQuestPlaces(
     }
   }
 
-  console.log(`[SideQuest] Selected ${selected.length} diverse places for quests (all within ${config.maxDistance}km)`);
   return selected;
 }
 
@@ -222,8 +214,6 @@ export function generateRandomQuestPoints(
 ): Coordinates[] {
   const config = DISTANCE_RANGES[distanceRange];
   const points: Coordinates[] = [];
-
-  console.warn('[SideQuest] Using random coordinate generation (Places API fallback)');
 
   for (let i = 0; i < count; i++) {
     // Random angle in radians
@@ -263,14 +253,11 @@ export async function getQuestLocations(
     if (places && places.length >= count) {
       const selected = selectQuestPlaces(places, count, distanceRange, center);
       if (selected.length >= count) {
-        console.log('[SideQuest] Using Places API for quest locations');
         return selected;
       }
     }
-
-    console.warn('[SideQuest] Insufficient places found, using fallback');
-  } catch (error) {
-    console.error('[SideQuest] Places API failed, using fallback:', error);
+  } catch {
+    // Places API failed, using fallback
   }
 
   // Fallback to random coordinates

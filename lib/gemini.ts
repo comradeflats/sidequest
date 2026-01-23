@@ -38,8 +38,6 @@ export const getModel = (type: 'campaign' | 'verification' | 'image' = 'verifica
       break;
   }
 
-  console.log(`[SideQuest] Initializing Gemini 3 model: ${modelName} for task: ${type}`);
-
   return genAI.getGenerativeModel({
     model: modelName,
     ...config
@@ -97,8 +95,7 @@ export async function generateQuestImage(quest: Quest): Promise<string | null> {
     }
 
     return null;
-  } catch (error) {
-    console.error(`[SideQuest] Failed to generate image for quest ${quest.id}:`, error);
+  } catch {
     return null;
   }
 }

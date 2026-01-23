@@ -226,15 +226,12 @@ export default function Home() {
       setIsResuming(true);
 
       try {
-        console.log(`[App] Regenerating ${questsNeedingImages.length} quest images in parallel...`);
-
         // Regenerate images in parallel for faster loading
         const imagePromises = questsNeedingImages.map(async (quest) => {
           try {
             const imageUrl = await generateQuestImage(quest);
             return { questId: quest.id, imageUrl: imageUrl || undefined };
-          } catch (error) {
-            console.error(`[App] Failed to regenerate image for quest ${quest.id}:`, error);
+          } catch {
             return { questId: quest.id, imageUrl: undefined };
           }
         });
@@ -248,8 +245,8 @@ export default function Home() {
             quest.imageUrl = result.imageUrl;
           }
         }
-      } catch (error) {
-        console.error('[App] Failed to regenerate images:', error);
+      } catch {
+        // Failed to regenerate images
       } finally {
         setIsLoading(false);
         setIsResuming(false);
@@ -264,11 +261,9 @@ export default function Home() {
     // Restore journey stats if available
     if (stored.journeyStats) {
       resetWithStats(stored.journeyStats);
-      console.log('[App] Restored journey stats from storage');
     }
 
     setSavedCampaignId(null);
-    console.log('[App] Resumed campaign from storage');
   };
 
   // Rotating messages for different loading states
@@ -340,9 +335,13 @@ export default function Home() {
         }
       });
     } catch (error: unknown) {
-      console.error(error);
       const errorMessage = error instanceof Error ? error.message : 'Failed to initialize adventure.';
-      alert(`Error: ${errorMessage}\n\nPlease check your API keys and try again.`);
+      // Show user-friendly error without exposing technical details
+      if (errorMessage.includes('API key')) {
+        alert('Configuration error. Please contact support.');
+      } else {
+        alert('Failed to create adventure. Please try again.');
+      }
     } finally {
       setIsLoading(false);
     }
@@ -366,22 +365,6 @@ export default function Home() {
       const freshGps = await refreshLocation();
       const verificationGps = freshGps || userGps;
       const verificationAccuracy = freshGps ? gpsAccuracy : gpsAccuracy;
-
-      console.log('[Verification] GPS for verification:', {
-        fresh: !!freshGps,
-        userCoords: verificationGps ? `${verificationGps.lat.toFixed(6)}, ${verificationGps.lng.toFixed(6)}` : 'none',
-        accuracy: verificationAccuracy ? `±${verificationAccuracy.toFixed(0)}m` : 'unknown'
-      });
-
-      // Debug logging for GPS distance bug investigation
-      console.log('[Verification] Quest coordinates check:', {
-        questId: currentQuest.id,
-        questTitle: currentQuest.title,
-        questCoords: currentQuest.coordinates
-          ? `${currentQuest.coordinates.lat.toFixed(6)}, ${currentQuest.coordinates.lng.toFixed(6)}`
-          : 'UNDEFINED - THIS IS THE BUG!',
-        hasCoordinates: !!currentQuest.coordinates
-      });
 
       // Track verification attempt
       trackEvent({
@@ -442,9 +425,8 @@ export default function Home() {
           }
         });
       }
-    } catch (error) {
-      console.error(error);
-      alert('Verification failed. The satellite signal was lost.');
+    } catch {
+      alert('Verification failed. Please check your connection and try again.');
       setIsVerifying(false);
     }
   };
@@ -510,9 +492,8 @@ export default function Home() {
       }
 
       setShowAppealDialog(false);
-    } catch (error) {
-      console.error(error);
-      alert('Appeal failed. Please try again.');
+    } catch {
+      alert('Unable to process appeal. Please try again.');
     } finally {
       setIsAppealing(false);
     }

@@ -24,13 +24,11 @@ export function openDatabase(): Promise<IDBDatabase> {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
     request.onerror = () => {
-      console.error('[IndexedDB] Failed to open database:', request.error);
       reject(request.error);
     };
 
     request.onsuccess = () => {
       dbInstance = request.result;
-      console.log('[IndexedDB] Database opened successfully');
       resolve(request.result);
     };
 
@@ -41,7 +39,6 @@ export function openDatabase(): Promise<IDBDatabase> {
       if (!db.objectStoreNames.contains(IMAGES_STORE)) {
         const store = db.createObjectStore(IMAGES_STORE, { keyPath: ['campaignId', 'questId'] });
         store.createIndex('campaignId', 'campaignId', { unique: false });
-        console.log('[IndexedDB] Created quest-images store');
       }
 
       // Create media store for video/audio submissions
@@ -49,7 +46,6 @@ export function openDatabase(): Promise<IDBDatabase> {
         const mediaStore = db.createObjectStore(MEDIA_STORE, { keyPath: ['campaignId', 'questId'] });
         mediaStore.createIndex('campaignId', 'campaignId', { unique: false });
         mediaStore.createIndex('mediaType', 'mediaType', { unique: false });
-        console.log('[IndexedDB] Created quest-media store');
       }
     };
   });
@@ -78,17 +74,15 @@ export async function saveImageToIndexedDB(
       });
 
       request.onsuccess = () => {
-        console.log(`[IndexedDB] Saved image for quest ${questId}`);
         resolve();
       };
 
       request.onerror = () => {
-        console.error(`[IndexedDB] Failed to save image for quest ${questId}:`, request.error);
         reject(request.error);
       };
     });
-  } catch (error) {
-    console.error('[IndexedDB] saveImageToIndexedDB error:', error);
+  } catch {
+    // saveImageToIndexedDB error
   }
 }
 
@@ -117,12 +111,10 @@ export async function getImageFromIndexedDB(
       };
 
       request.onerror = () => {
-        console.error(`[IndexedDB] Failed to get image for quest ${questId}:`, request.error);
         reject(request.error);
       };
     });
-  } catch (error) {
-    console.error('[IndexedDB] getImageFromIndexedDB error:', error);
+  } catch {
     return null;
   }
 }
@@ -139,7 +131,6 @@ export async function saveCampaignImages(
     .map(quest => saveImageToIndexedDB(campaignId, quest.id, quest.imageUrl!));
 
   await Promise.all(savePromises);
-  console.log(`[IndexedDB] Saved ${savePromises.length} images for campaign ${campaignId}`);
 }
 
 /**
@@ -159,7 +150,6 @@ export async function loadCampaignImages(
   });
 
   await Promise.all(loadPromises);
-  console.log(`[IndexedDB] Loaded ${Object.keys(images).length}/${questIds.length} images for campaign ${campaignId}`);
 
   return images;
 }
@@ -184,18 +174,16 @@ export async function deleteImagesForCampaign(campaignId: string): Promise<void>
           cursor.delete();
           cursor.continue();
         } else {
-          console.log(`[IndexedDB] Deleted all images for campaign ${campaignId}`);
           resolve();
         }
       };
 
       request.onerror = () => {
-        console.error(`[IndexedDB] Failed to delete images for campaign ${campaignId}:`, request.error);
         reject(request.error);
       };
     });
-  } catch (error) {
-    console.error('[IndexedDB] deleteImagesForCampaign error:', error);
+  } catch {
+    // deleteImagesForCampaign error
   }
 }
 
@@ -253,17 +241,15 @@ export async function saveMediaToIndexedDB(
       const request = store.put(mediaRecord);
 
       request.onsuccess = () => {
-        console.log(`[IndexedDB] Saved ${mediaType} for quest ${questId}`);
         resolve();
       };
 
       request.onerror = () => {
-        console.error(`[IndexedDB] Failed to save ${mediaType} for quest ${questId}:`, request.error);
         reject(request.error);
       };
     });
-  } catch (error) {
-    console.error('[IndexedDB] saveMediaToIndexedDB error:', error);
+  } catch {
+    // saveMediaToIndexedDB error
   }
 }
 
@@ -292,12 +278,10 @@ export async function getMediaFromIndexedDB(
       };
 
       request.onerror = () => {
-        console.error(`[IndexedDB] Failed to get media for quest ${questId}:`, request.error);
         reject(request.error);
       };
     });
-  } catch (error) {
-    console.error('[IndexedDB] getMediaFromIndexedDB error:', error);
+  } catch {
     return null;
   }
 }
@@ -322,18 +306,16 @@ export async function deleteMediaForCampaign(campaignId: string): Promise<void> 
           cursor.delete();
           cursor.continue();
         } else {
-          console.log(`[IndexedDB] Deleted all media for campaign ${campaignId}`);
           resolve();
         }
       };
 
       request.onerror = () => {
-        console.error(`[IndexedDB] Failed to delete media for campaign ${campaignId}:`, request.error);
         reject(request.error);
       };
     });
-  } catch (error) {
-    console.error('[IndexedDB] deleteMediaForCampaign error:', error);
+  } catch {
+    // deleteMediaForCampaign error
   }
 }
 

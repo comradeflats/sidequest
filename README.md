@@ -1,223 +1,197 @@
-# 🎮 SideQuest
+# SideQuest
 
 > AI-powered location-based scavenger hunt game powered by **Google Gemini 3**
 
-SideQuest is an immersive AR-style scavenger hunt application that combines real-world exploration with AI-generated quests and visual verification. Built for the Gemini 3 Gameathon, it showcases the latest Google AI capabilities including text generation, vision analysis, and image synthesis.
-
-![SideQuest](https://img.shields.io/badge/Powered%20by-Gemini%203-10b981?style=for-the-badge&logo=google)
-![Next.js](https://img.shields.io/badge/Next.js-16.1.1-black?style=for-the-badge&logo=next.js)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)
-
-## 🆕 Latest Updates
-
-### January 16, 2026 - IndexedDB Image Caching
-
-**✅ Major Cost Optimization:**
-- ✅ Quest images now persist in IndexedDB (~50MB+ storage vs localStorage's 5MB)
-- ✅ No more image regeneration on session resume - saves $0.12-$0.20 per resume
-- ✅ Images load instantly from local cache
-- ✅ Graceful fallback to regeneration if cache unavailable
-- 📋 **Impact:** Eliminates redundant Gemini API calls, significant cost savings
-
-### January 13, 2026 - Ready for Hackathon Submission
-
-**✅ Production Ready - English Version:**
-- ✅ Next.js 16 compatibility fixed (params Promise issue resolved)
-- ✅ App running smoothly on localhost
-- ✅ All core features functional
-- ✅ Video generation removed (reverted to image-only for stability)
-
-### January 12, 2026 - Phase 1.5 Complete
-
-Major UX improvements based on real-world testing:
-- ✅ **Verification Appeal System** - Users can explain context when AI makes mistakes
-- ✅ **GPS-Enhanced Verification** - More accurate verification using location proximity
-- ✅ **Journey Tracking** - Live stats and completion visualization with Google Maps integration
-- ✅ **Fuzzy Location View** - Shows general area without spoiling exact location
-- ✅ **Native Maps Integration** - Opens walking directions in Google Maps app
+[![Powered by Gemini 3](https://img.shields.io/badge/Powered%20by-Gemini%203-10b981?style=for-the-badge&logo=google)](https://ai.google.dev/)
+[![Gemini 3 Hackathon](https://img.shields.io/badge/Gemini%203-Hackathon%202026-4285F4?style=for-the-badge&logo=google)](https://ai.google.dev/competition)
+[![Next.js](https://img.shields.io/badge/Next.js-16.1.1-black?style=for-the-badge&logo=next.js)](https://nextjs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5-blue?style=for-the-badge&logo=typescript)](https://www.typescriptlang.org/)
 
 ---
 
-## 🎮 Game Overview
+## Overview
 
-**SideQuest** transforms your city into an interactive adventure playground. Enter any location worldwide, and Gemini 3 generates a personalized scavenger hunt with culturally relevant quests, complete with 16-bit pixel art visualizations.
+**SideQuest** transforms any city into an interactive adventure playground using Google's Gemini 3 AI. Enter a location anywhere in the world, and the AI generates personalized scavenger hunts with culturally relevant quests, 16-bit pixel art visualizations, and intelligent multi-modal verification.
 
-### How It Works
-
-1. **🗺️ Choose Your Adventure**
-   - Enter your location (e.g., "Da Nang, Vietnam" or "New York City")
-   - Select campaign type:
-     - **QUICK_HUNT**: 2-3 nearby quests (~1 hour)
-     - **CITY_ODYSSEY**: 4-5 quests across the city (full day)
-
-2. **🎨 AI-Generated Quests**
-   - Gemini 3 Flash creates culturally-aware, location-specific challenges
-   - Each quest includes:
-     - 16-bit pixel art visualization (Gemini 3 Pro Image)
-     - Narrative backstory
-     - Hidden verification criteria
-     - Location hints
-
-3. **🗺️ Navigate to Quest**
-   - View live journey stats (distance, duration)
-   - Tap "VIEW AREA ON MAP" to see general neighborhood
-   - Use GPS tracking to record your exploration path
-
-4. **📸 Real-World Verification**
-   - Use your camera to capture quest objectives
-   - Gemini 3 Flash analyzes photos with GPS context
-   - Receive witty AI feedback on your attempts
-   - **If verification fails**: Appeal with text explanation
-     - AI reconsiders with your context + GPS proximity
-     - More forgiving if you're within 30m of target
-
-5. **🏆 Complete & Progress**
-   - Unlock new quests as you complete challenges
-   - Track your journey stats in real-time
-   - View journey map with walking directions at completion
-   - Explore your city through AI-curated adventures
+Built for solo travelers, urban explorers, and anyone who wants to discover their city through AI-curated adventures. The game combines real-world exploration with retro gaming aesthetics and smart AI that understands photos, videos, and audio recordings.
 
 ---
 
-## ✨ Key Features
+## Demo
 
-### 🤖 Powered by Gemini 3
-- **Campaign Generation**: Gemini 3 Flash generates creative, context-aware quests
-- **Vision Verification**: Real-time photo analysis with Gemini 3 Flash vision capabilities
-- **Image Synthesis**: 16-bit pixel art generated by Gemini 3 Pro Image (Nano Banana Pro)
-- **Appeal System**: AI re-evaluates photos with user explanations when mistakes occur
-- **GPS-Enhanced Verification**: More forgiving verification when user is within 30m of target
+**Live Demo:** [Coming Soon]
 
-### 🗺️ Journey Tracking & Navigation
-- **Live GPS Tracking**: Records your actual walking path throughout the campaign
-- **Journey Stats**: Real-time distance, duration, and waypoint tracking
-- **Native Maps Integration**: Opens Google Maps with walking directions through all quest locations
-- **Fuzzy Location View**: Shows neighborhood area without spoiling exact quest location (75-150m offset)
-- **Completion Visualization**: Journey summary with all stats when you finish
+**Demo Video:** [Link to 3-minute demonstration video]
 
-### 🎨 Retro Gaming Aesthetic
-- 16-bit pixel art style inspired by SNES/Genesis era
+**Repository:** [github.com/comradeflats/sidequest](https://github.com/comradeflats/sidequest)
+
+---
+
+## Gemini 3 Integration
+
+SideQuest showcases the **full multi-modal capabilities** of Google's Gemini 3 model family—text generation, vision analysis, audio understanding, and image synthesis—working together in a single application.
+
+### Models Used
+
+| Model | Purpose | Implementation |
+|-------|---------|----------------|
+| **Gemini 3 Flash** | Quest Generation | Creates culturally-aware, location-specific challenges with narratives, objectives, and hidden verification criteria |
+| **Gemini 3 Flash (Multi-Modal)** | Media Verification | Analyzes **photos, videos, and audio recordings** against quest objectives with GPS context |
+| **Gemini 3 Pro Image** | Image Synthesis | Generates 16-bit pixel art visualizations for each quest in SNES/Genesis aesthetic |
+
+### Technical Implementation
+
+**Quest Generation Pipeline:**
+- User inputs any global location (e.g., "Da Nang, Vietnam", "New York City")
+- Gemini 3 Flash generates structured JSON with 2-5 quests based on campaign type
+- Each quest includes: narrative backstory, public objective, secret verification criteria, GPS coordinates, and difficulty rating
+- Cultural context is automatically incorporated based on location
+
+**Multi-Modal Quest Verification:**
+- Quests can require different media types: **photos, video recordings, or audio recordings**
+- Gemini 3 Flash analyzes all media types with its multi-modal capabilities:
+  - **Photo quests**: Capture images of landmarks, objects, or scenes
+  - **Video quests**: Record 5-30 second clips demonstrating actions or environments
+  - **Audio quests**: Record 10-60 seconds of ambient sounds, music, or spoken content
+- GPS-enhanced verification: more forgiving when user is within 30 meters of target location
+- Appeal system allows users to provide context when AI makes mistakes, triggering re-evaluation
+
+**16-Bit Image Generation:**
+- Gemini 3 Pro Image generates quest visualizations with consistent retro aesthetic
+- Custom prompt engineering for SNES/Genesis-era pixel art style
+- Images cached in IndexedDB (~50MB storage) to minimize API costs on session resume
+- Parallel generation for all quest images during campaign creation
+
+### Code References
+
+- Quest generation prompts: `lib/game-logic.ts`
+- Gemini model configuration: `lib/gemini.ts`
+- Vision verification logic: `lib/game-logic.ts`
+- Image caching system: `lib/indexeddb-storage.ts`
+
+---
+
+## Key Features
+
+### AI-Powered Gameplay
+- **Dynamic Quest Generation** - Culturally-aware challenges for any location worldwide
+- **Multi-Modal Verification** - AI analyzes photos, videos, and audio recordings with GPS context
+- **Appeal System** - Explain context when verification fails; AI reconsiders with your input
+- **16-Bit Art Generation** - Every quest includes unique pixel art visualization
+
+### Journey Tracking & Navigation
+- **Live GPS Tracking** - Records walking path throughout campaign
+- **Journey Stats** - Real-time distance, duration, and waypoint tracking
+- **Native Maps Integration** - Opens Google Maps with walking directions
+- **Fuzzy Location View** - Shows general area without spoiling exact location (75-150m offset)
+
+### Retro Gaming Aesthetic
+- 16-bit pixel art inspired by SNES/Genesis era
 - Terminal-inspired UI with emerald green color scheme
 - Smooth animations with Framer Motion
 - Monospace fonts and ALL_CAPS styling
 
-### 📱 Progressive Web App (PWA)
+### Progressive Web App
 - Installable on mobile devices
-- Works offline (service worker support)
+- Works offline with service worker support
 - Native-like experience on iOS and Android
-- Location permission handling for GPS features
-
-### 🌐 Universal Compatibility
-- Works anywhere in the world
-- Culturally-adaptive quest generation
-- Supports locations worldwide (English interface)
 - Battery-efficient GPS tracking (<10% per 30min)
 
 ---
 
-## 🛠️ Tech Stack
+## How It Works
 
-### Frontend
-- **[Next.js 16.1.1](https://nextjs.org/)** - React framework with App Router
-- **[React 19.2.3](https://react.dev/)** - UI library
-- **[TypeScript 5](https://www.typescriptlang.org/)** - Type safety
-- **[Tailwind CSS 4](https://tailwindcss.com/)** - Utility-first styling
-- **[Framer Motion 12](https://www.framer.com/motion/)** - Animations
+1. **Choose Your Adventure**
+   - Enter any location worldwide
+   - Select campaign type:
+     - **QUICK_HUNT**: 2-3 nearby quests (~1 hour)
+     - **CITY_ODYSSEY**: 4-5 quests across the city (full day)
 
-### AI & APIs
-- **[@google/generative-ai 0.24.1](https://www.npmjs.com/package/@google/generative-ai)** - Google Gemini SDK
-- **Gemini 3 Flash** - Text generation & vision analysis
-- **Gemini 3 Pro Image** - Image generation (Nano Banana Pro)
+2. **AI Generates Your Quest**
+   - Gemini 3 Flash creates location-specific challenges
+   - Gemini 3 Pro Image generates 16-bit pixel art for each quest
+   - Each quest includes narrative backstory, objectives, and hidden verification criteria
 
-### Camera & Media
-- **[react-webcam 7.2.0](https://www.npmjs.com/package/react-webcam)** - Camera access
-- **[lucide-react](https://lucide.dev/)** - Icon system
+3. **Navigate to Quest**
+   - View live journey stats (distance, duration)
+   - Tap "VIEW AREA ON MAP" to see general neighborhood
+   - GPS tracking records your exploration path
 
-### PWA Support
-- **[next-pwa 5.6.0](https://www.npmjs.com/package/next-pwa)** - Progressive Web App capabilities
+4. **Complete with Photos, Video, or Audio**
+   - Capture quest objectives using the required media type
+   - **Photo quests**: Snap pictures of landmarks, objects, or scenes
+   - **Video quests**: Record short clips (5-30s) of actions or environments
+   - **Audio quests**: Capture ambient sounds, music, or spoken content (10-60s)
+   - Gemini 3 Flash analyzes all media types with GPS context
+   - Appeal with text explanation if verification fails
+
+5. **Complete & Progress**
+   - Unlock new quests as you complete challenges
+   - View journey map with walking directions at completion
+   - Track total distance and time across your adventure
 
 ---
 
-## 🚀 Getting Started
+## Tech Stack
+
+### Frontend
+- **Next.js 16.1.1** - React framework with App Router
+- **React 19.2.3** - UI library
+- **TypeScript 5** - Type safety
+- **Tailwind CSS 4** - Utility-first styling
+- **Framer Motion 12** - Animations
+
+### AI & APIs
+- **@google/generative-ai 0.24.1** - Google Gemini SDK
+- **Gemini 3 Flash** - Text generation & multi-modal analysis (photo/video/audio)
+- **Gemini 3 Pro Image** - Image generation
+
+### Storage & Media
+- **IndexedDB** - Local image caching (~50MB)
+- **react-webcam 7.2.0** - Camera access
+- **next-pwa 5.6.0** - Progressive Web App support
+
+---
+
+## Getting Started
 
 ### Prerequisites
-- Node.js 18+ installed
-- Google Cloud account with billing enabled (for Gemini 3 access)
+- Node.js 18+
+- Google Cloud account with billing enabled
 - Gemini API key
 
 ### Installation
 
-1. **Clone the repository**
-   ```bash
-   git clone https://github.com/comradeflats/sidequest.git
-   cd sidequest
-   ```
-
-2. **Install dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Set up environment variables**
-
-   Create a `.env.local` file in the root directory:
-   ```env
-   NEXT_PUBLIC_GEMINI_API_KEY=your_google_cloud_api_key_here
-   ```
-
-   **Important:** Use a Google Cloud API key (not Google AI Studio free tier) to access Gemini 3 Pro Image.
-
-4. **Run the development server**
-   ```bash
-   npm run dev
-   ```
-
-5. **Open your browser**
-
-   Navigate to [http://localhost:3000](http://localhost:3000)
-
-### Building for Production
-
 ```bash
-npm run build
-npm start
+# Clone the repository
+git clone https://github.com/comradeflats/sidequest.git
+cd sidequest
+
+# Install dependencies
+npm install
+
+# Set up environment variables
+echo "NEXT_PUBLIC_GEMINI_API_KEY=your_api_key_here" > .env.local
+
+# Run development server
+npm run dev
 ```
 
----
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-## 🔑 Getting Your Gemini API Key
-
-### Option 1: Google Cloud (Recommended for Gemini 3 Pro Image)
+### Getting Your API Key
 
 1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project or select an existing one
-3. Enable the **Generative Language API**:
-   - Visit: https://console.cloud.google.com/apis/library/generativelanguage.googleapis.com
-   - Click "Enable"
-4. Enable billing on your project (free $300 credits available)
-5. Create credentials:
-   - Go to: https://console.cloud.google.com/apis/credentials
-   - Click "+ CREATE CREDENTIALS" → "API Key"
-   - Copy your new API key
-6. Add to `.env.local`:
-   ```env
-   NEXT_PUBLIC_GEMINI_API_KEY=AIza...your_key_here
-   ```
+2. Enable the **Generative Language API**
+3. Enable billing (free $300 credits available)
+4. Create credentials: API Key
+5. Add to `.env.local`
 
-### Option 2: Google AI Studio (Free Tier - Limited)
-
-1. Visit [Google AI Studio](https://aistudio.google.com/apikey)
-2. Click "Get API key"
-3. Copy your API key
-
-**Note:** Free tier has quota limits:
-- ✅ Gemini 3 Flash: Available
-- ❌ Gemini 3 Pro: Requires billing
-- ❌ Gemini 3 Pro Image: Requires billing
+**Note:** Gemini 3 Pro Image requires billing. Free tier only supports Gemini 3 Flash.
 
 ---
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 sidequest/
@@ -229,273 +203,39 @@ sidequest/
 │   └── Scanner.tsx           # Camera interface for photo capture
 ├── lib/
 │   ├── gemini.ts             # Gemini 3 model configuration
-│   └── game-logic.ts         # Campaign generation & photo verification
+│   ├── game-logic.ts         # Campaign generation & verification
+│   └── indexeddb-storage.ts  # Image caching system
 ├── types/
-│   └── index.ts              # TypeScript interfaces (Quest, Campaign)
-├── public/                   # Static assets
-├── .env.local                # Environment variables (not committed)
-├── package.json              # Dependencies
-├── tsconfig.json             # TypeScript configuration
-└── tailwind.config.ts        # Tailwind CSS configuration
+│   └── index.ts              # TypeScript interfaces
+└── public/                   # Static assets
 ```
 
 ---
 
-## 🎯 Core Game Logic
+## Troubleshooting
 
-### Campaign Generation Flow
-
-```typescript
-// lib/game-logic.ts
-1. User enters location → "Da Nang, Vietnam"
-2. Gemini 3 Flash generates quest JSON
-3. For each quest:
-   - Gemini 3 Pro Image generates 16-bit pixel art
-   - Images stored as base64 data URLs
-4. Return complete campaign with images
-```
-
-### Photo Verification Flow
-
-```typescript
-// lib/game-logic.ts
-1. User captures photo with camera
-2. Image sent to Gemini 3 Flash (vision mode)
-3. AI verifies against:
-   - Quest objective
-   - Secret criteria (hidden from user)
-4. Returns success/failure + witty feedback
-```
+| Issue | Solution |
+|-------|----------|
+| **API Quota Exceeded (429)** | Switch from free tier to Google Cloud API key with billing |
+| **Images Not Generating** | Gemini 3 Pro Image requires billing; verify Google Cloud API key |
+| **Camera Not Working** | Grant browser permissions; use HTTPS in production |
 
 ---
 
-## 🎨 UI Design System
+## License
 
-### Color Palette
-- **Primary**: Emerald Green (`#10b981`, `emerald-400`)
-- **Background**: Black (`#0a0a0a`)
-- **Accents**: Emerald variants (`emerald-700`, `emerald-950`)
-- **Text**: White, emerald shades
-
-### Typography
-- **Body**: Monospace fonts (Geist Mono)
-- **Labels**: ALL_CAPS styling
-- **Terminal aesthetic**: Underscores in labels (e.g., `OBJECTIVE_`)
-
-### Animations
-- Framer Motion page transitions
-- Fade/slide effects on state changes
-- Spinner loading states
-- Smooth quest transitions
+MIT License - see [LICENSE](LICENSE) for details.
 
 ---
 
-## 🧪 Testing the Game
+## Acknowledgments
 
-### Quick Test Flow
-
-1. **Start the app**: `npm run dev`
-2. **Enter location**: "San Francisco, California"
-3. **Select**: QUICK_HUNT
-4. **Wait**: ~15-25 seconds (campaign + image generation)
-5. **View quest**: See 16-bit pixel art + narrative
-6. **Click**: INITIALIZE_SCANNER
-7. **Capture photo**: Use camera or upload image
-8. **Verify**: Wait for AI analysis
-9. **Proceed**: Move to next quest or retry
-
-### Expected Console Logs
-
-```
-[SideQuest] Initializing Gemini 3 model: gemini-3-flash-preview for task: campaign
-[SideQuest] Generating quest images...
-[SideQuest] Initializing Gemini 3 model: gemini-3-pro-image-preview for task: image
-[SideQuest] Initializing Gemini 3 model: gemini-3-flash-preview for task: verification
-```
-
----
-
-## 🐛 Troubleshooting
-
-### Issue: API Quota Exceeded (429 Error)
-
-**Error:**
-```
-Quota exceeded for metric: generativelanguage.googleapis.com/generate_content_free_tier
-```
-
-**Solution:**
-- You're using a free tier API key
-- Switch to Google Cloud API key with billing enabled
-- See [Getting Your Gemini API Key](#-getting-your-gemini-api-key)
-
-### Issue: Images Not Generating
-
-**Symptoms:**
-- Quests display without images
-- Console shows 429 errors for `gemini-3-pro-image`
-
-**Solution:**
-- Gemini 3 Pro Image requires billing
-- Enable billing in Google Cloud Console
-- Verify your API key is from Google Cloud (not AI Studio)
-
-### Issue: Camera Not Working
-
-**Symptoms:**
-- Black screen in scanner
-- Permission denied errors
-
-**Solution:**
-- Grant camera permissions in browser
-- Use HTTPS in production (required for camera access)
-- Test on localhost:3000 (allowed by default)
-
-### Issue: Campaign Generation Fails
-
-**Check:**
-1. API key is correctly set in `.env.local`
-2. Generative Language API is enabled in Google Cloud
-3. Project has billing enabled
-4. Check browser console for specific error messages
-
----
-
-## 🌟 Gemini 3 Integration Details
-
-### Models Used
-
-| Model | Use Case | API Name |
-|-------|----------|----------|
-| **Gemini 3 Flash** | Campaign generation | `gemini-3-flash-preview` |
-| **Gemini 3 Flash** | Photo verification (vision) | `gemini-3-flash-preview` |
-| **Gemini 3 Pro Image** | Quest image generation | `gemini-3-pro-image-preview` |
-
-### Prompt Engineering
-
-**Campaign Generation Prompt** (lib/game-logic.ts:7-33)
-- Context: Location, campaign type
-- Output: Structured JSON with quest array
-- Features: Cultural relevance, difficulty levels, secret criteria
-
-**Image Generation Prompt** (lib/gemini.ts:45-62)
-- Style: 16-bit pixel art (SNES/Genesis era)
-- Colors: Vibrant retro palette with emerald accents
-- Orientation: Landscape (mobile-optimized)
-- Theme: Adventure/exploration aesthetic
-
-**Verification Prompt** (lib/game-logic.ts:75-83)
-- Input: Photo + objective + secret criteria
-- Output: JSON with success boolean + feedback
-- Tone: Witty, personality-driven comments
-
----
-
-## 📊 Performance Metrics
-
-### Campaign Creation
-- **Time**: ~15-25 seconds (includes image generation)
-- **Images**: 2-5 generated in parallel
-- **Size**: ~100-300KB per image (base64)
-- **Total memory**: ~1-1.5MB for full campaign
-
-### Photo Verification
-- **Latency**: ~2-4 seconds
-- **Model**: Gemini 3 Flash (optimized for speed)
-- **Accuracy**: High - uses hidden criteria for precise matching
-
----
-
-## 🚧 Future Enhancements
-
-### Planned Features
-- [ ] Multiplayer campaigns (compete with friends)
-- [ ] Leaderboards and achievements
-- [ ] Quest difficulty ratings
-- [ ] Progressive difficulty scaling
-- [ ] Historical/educational quest themes
-- [ ] AR overlays with device orientation
-- [ ] Social sharing of completed quests
-- [ ] Custom campaign creation tools
-- [ ] Offline mode with cached campaigns
-- [ ] Location-based push notifications
-
-### Technical Improvements
-- [x] Image caching (IndexedDB) - ✅ Implemented Jan 16, 2026
-- [ ] Progressive image loading
-- [ ] Optimize bundle size
-- [ ] Add unit tests (Jest + React Testing Library)
-- [ ] E2E tests (Playwright)
-- [ ] Analytics integration
-- [ ] Error tracking (Sentry)
-- [ ] A/B testing framework
-
----
-
-## 🤝 Contributing
-
-Contributions are welcome! Please follow these steps:
-
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Guidelines
-- Follow existing code style (TypeScript, ESLint)
-- Add comments for complex logic
-- Test all features before submitting
-- Update documentation as needed
-
----
-
-## 📜 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
----
-
-## 🙏 Acknowledgments
-
-- **Google Gemini Team** - For the incredible Gemini 3 API
-- **Vercel** - Next.js framework and hosting
+- **Google Gemini Team** - Gemini 3 API
+- **Vercel** - Next.js framework
 - **Tailwind Labs** - Tailwind CSS
-- **Framer** - Framer Motion animations
-- **Lucide** - Icon system
 
 ---
 
-## 📞 Support
+**Built by [@comradeflats](https://github.com/comradeflats) for the Gemini 3 Hackathon 2026**
 
-### Issues
-Report bugs or request features: [GitHub Issues](https://github.com/comradeflats/sidequest/issues)
-
-### Documentation
-- [Gemini API Docs](https://ai.google.dev/gemini-api/docs)
-- [Next.js Documentation](https://nextjs.org/docs)
-- [Tailwind CSS Docs](https://tailwindcss.com/docs)
-
-### Contact
-- Developer: [@comradeflats](https://github.com/comradeflats)
-- Hackathon: Gemini 3 Gameathon 2026
-
----
-
-## 📸 Screenshots
-
-### Quest Interface
-Beautiful 16-bit pixel art generated by Gemini 3 Pro Image, combined with AI-crafted narratives.
-
-### Scanner Interface
-Real-time camera feed with retro HUD overlay for immersive quest verification.
-
-### Verification Results
-Witty AI feedback on your photo attempts with clear success/failure indicators.
-
----
-
-**Built with ❤️ for the Gemini 3 Gameathon**
-
-*Explore your world. One quest at a time.* 🌍✨
-# sidequest
+*Explore your world. One quest at a time.*

@@ -68,7 +68,6 @@ export async function geocodeLocation(locationString: string): Promise<LocationD
       formattedAddress: result.formatted_address,
     };
   } catch (error) {
-    console.error('[SideQuest] Geocoding error:', error);
     throw error;
   }
 }
@@ -93,12 +92,6 @@ export async function calculateDistance(
   const travelMode = 'walking';
 
   try {
-    console.log('[SideQuest] Distance Matrix API call:', {
-      origin: `${origin.lat},${origin.lng}`,
-      destination: `${destination.lat},${destination.lng}`,
-      mode: travelMode
-    });
-
     // Track API call cost (1 element)
     costEstimator.trackMapsDistanceCall(1);
 
@@ -116,24 +109,15 @@ export async function calculateDistance(
 
     const data = await response.json();
 
-    console.log('[SideQuest] Distance Matrix response:', {
-      status: data.status,
-      elementStatus: data.rows?.[0]?.elements?.[0]?.status
-    });
-
     if (data.status !== 'OK') {
-      console.warn(`[SideQuest] Distance Matrix API returned status: ${data.status}`);
       return calculateStraightLineDistance(origin, destination);
     }
 
     const element = data.rows[0]?.elements[0];
 
     if (!element || element.status !== 'OK') {
-      console.warn(`[SideQuest] No route found for distance calculation. Using straight-line fallback.`);
       return calculateStraightLineDistance(origin, destination);
     }
-
-    console.log('[SideQuest] Route found:', element.distance.text, element.duration.text);
 
     return {
       distanceMeters: element.distance.value,
@@ -141,8 +125,7 @@ export async function calculateDistance(
       durationSeconds: element.duration.value,
       durationMinutes: Math.round(element.duration.value / 60),
     };
-  } catch (error) {
-    console.error('[SideQuest] Distance calculation error:', error);
+  } catch {
     return calculateStraightLineDistance(origin, destination);
   }
 }
@@ -187,7 +170,6 @@ export async function calculateDistances(
     const data = await response.json();
 
     if (data.status !== 'OK') {
-      console.warn(`[SideQuest] Distance Matrix API failed: ${data.status}. Using fallback.`);
       return destinations.map((dest) => calculateStraightLineDistance(origin, dest));
     }
 
@@ -203,8 +185,7 @@ export async function calculateDistances(
         durationMinutes: Math.round(element.duration.value / 60),
       };
     });
-  } catch (error) {
-    console.error('[SideQuest] Batch distance calculation error:', error);
+  } catch {
     return destinations.map((dest) => calculateStraightLineDistance(origin, dest));
   }
 }
@@ -243,12 +224,6 @@ function calculateStraightLineDistance(
   // Walking speed: 5 km/h (reasonable for city exploration)
   const walkingSpeedKmh = 5;
   const durationMinutes = Math.round((adjustedDistance / walkingSpeedKmh) * 60);
-
-  console.warn(
-    '[SideQuest] Using fallback distance calculation for route:',
-    `${origin.lat},${origin.lng} → ${destination.lat},${destination.lng}`,
-    `Distance: ${adjustedDistance.toFixed(2)}km, Duration: ${durationMinutes} min`
-  );
 
   return {
     distanceMeters: adjustedDistance * 1000,
