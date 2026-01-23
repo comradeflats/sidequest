@@ -6,6 +6,9 @@ import { User, LogOut, LogIn, Loader2, Cloud, CloudOff, HardDrive } from 'lucide
 import { useFirebase, signInAnonymous, signInWithGoogle, linkAnonymousToGoogle, signOut, PopupBlockedError } from '@/lib/firebase';
 import UsernameModal from './UsernameModal';
 
+// Debug: detect mobile
+const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+
 export default function AuthButton() {
   const {
     user,
@@ -22,6 +25,11 @@ export default function AuthButton() {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
+  const [debugLog, setDebugLog] = useState<string[]>([]);
+
+  const addDebug = (msg: string) => {
+    setDebugLog(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${msg}`]);
+  };
 
   // Show username modal when profile setup is needed (after anonymous sign-in)
   useEffect(() => {
@@ -58,29 +66,41 @@ export default function AuthButton() {
   const handleGoogleSignIn = async () => {
     setIsSigningIn(true);
     setError(null);
+    addDebug(`Starting Google sign-in (mobile: ${isMobile})`);
     try {
       if (user?.isAnonymous) {
+        addDebug('User is anonymous, attempting to link...');
         try {
           // Try to link anonymous account to Google
           await linkAnonymousToGoogle();
+          addDebug('Link successful');
         } catch (linkError: any) {
+          addDebug(`Link error: ${linkError.code}`);
           // If Google account already exists, sign out and sign in fresh
           if (linkError.code === 'auth/credential-already-in-use') {
+            addDebug('Credential in use, signing out...');
             await signOut();
+            addDebug('Signed out, signing in fresh...');
             await signInWithGoogle();
           } else {
             throw linkError;
           }
         }
       } else {
+        addDebug('No user, calling signInWithGoogle...');
         await signInWithGoogle();
+        addDebug('signInWithGoogle returned');
       }
       setIsMenuOpen(false);
     } catch (err: any) {
+      addDebug(`Caught error: ${err.code || err.message}`);
       if (err instanceof PopupBlockedError || err.code === 'auth/popup-blocked') {
         setError('Please allow popups for this site, or try Chrome/Safari.');
       } else {
-        setError('Failed to sign in with Google.');
+        // Show detailed error for debugging
+        const errorCode = err.code || 'unknown';
+        const errorMsg = err.message || 'Unknown error';
+        setError(`Error: ${errorCode} - ${errorMsg}`);
       }
       console.error('Google sign in error:', err);
     } finally {
@@ -366,6 +386,16 @@ export default function AuthButton() {
           </>
         )}
       </AnimatePresence>
+
+      {/* Debug Panel - Remove after fixing */}
+      {debugLog.length > 0 && (
+        <div className="fixed bottom-4 left-4 right-4 bg-black/95 border border-yellow-500 rounded-lg p-3 z-[100] max-h-40 overflow-auto">
+          <div className="text-yellow-500 text-xs font-bold mb-1">Debug Log (mobile: {isMobile ? 'YES' : 'NO'})</div>
+          {debugLog.map((log, i) => (
+            <div key={i} className="text-white text-xs font-mono">{log}</div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

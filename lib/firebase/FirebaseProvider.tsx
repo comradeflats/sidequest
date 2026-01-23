@@ -79,19 +79,20 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
     // Check for redirect result (handles mobile Google sign-in return)
     const handleRedirectResult = async () => {
       try {
-        await checkRedirectResult();
+        console.log('[FirebaseProvider] Checking redirect result...');
+        const user = await checkRedirectResult();
+        console.log('[FirebaseProvider] Redirect result:', user ? `User ${user.uid}` : 'No user');
       } catch (error: any) {
+        console.error('[FirebaseProvider] Redirect error:', error.code, error.message);
         // Handle credential-already-in-use from redirect (Google account already linked)
         if (error.code === 'auth/credential-already-in-use') {
-          console.log('Google account already linked, signing in fresh...');
+          console.log('[FirebaseProvider] Credential in use, signing out and retrying...');
           try {
             await signOut();
             await signInWithGoogle();
-          } catch (e) {
-            console.error('Failed to sign in after credential conflict:', e);
+          } catch (e: any) {
+            console.error('[FirebaseProvider] Failed to sign in after credential conflict:', e.code, e.message);
           }
-        } else {
-          console.error('Redirect result error:', error);
         }
       }
     };
