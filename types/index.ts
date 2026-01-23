@@ -97,6 +97,7 @@ export interface Quest {
   estimatedDuration?: number;     // minutes to reach this quest (walking)
   placeName?: string;             // Name of the place from Places API
   placeTypes?: string[];          // Place types from Places API
+  placeId?: string;               // Google Places API ID for tracking visited places
 }
 
 export interface Campaign {
@@ -195,6 +196,20 @@ export interface JourneyStats {
   durationMinutes: number;
   pathPoints: JourneyPoint[];
   questCompletionTimes: Date[]; // When each quest completed
+}
+
+// Visited place tracking for location variety
+export interface VisitedPlace {
+  placeId: string;
+  placeName: string;
+  visitedAt: Date;
+  campaignId: string;
+  coordinates: Coordinates;
+}
+
+export interface VisitedPlacesData {
+  places: VisitedPlace[];
+  lastUpdated: Date;
 }
 
 // Stored campaign data for persistence

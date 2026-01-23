@@ -28,7 +28,9 @@ import {
   markCampaignComplete,
   addToHistory,
   getCampaignHistory,
-  addXP
+  addXP,
+  addVisitedPlace,
+  migrateVisitedPlacesFromHistory
 } from '@/lib/storage';
 import { useSessionContext } from '@/hooks/useSessionContext';
 
@@ -132,9 +134,13 @@ export default function Home() {
     }
   }, [campaign]);
 
-  // Restore campaign on mount
+  // Restore campaign on mount and migrate visited places
   useEffect(() => {
-    const checkForExistingCampaign = async () => {
+    const initializeApp = async () => {
+      // Migrate visited places from history (one-time operation)
+      await migrateVisitedPlacesFromHistory();
+
+      // Check for existing campaign
       const activeCampaignId = await getCurrentCampaignId();
       if (activeCampaignId && !campaign) {
         const stored = await loadCampaign(activeCampaignId);
@@ -145,7 +151,7 @@ export default function Home() {
         }
       }
     };
-    checkForExistingCampaign();
+    initializeApp();
   }, []); // Run once on mount
 
   // Auto-save campaign when state changes
@@ -509,6 +515,18 @@ export default function Home() {
     const currentQuest = campaign.quests[campaign.currentQuestIndex];
     setCompletedQuests(prev => [...prev, currentQuest.id]);
 
+    // Track visited place for location variety in future campaigns
+    if (currentQuest.coordinates && currentQuest.placeName) {
+      // Use actual placeId from Places API, or fallback to coordinates-based ID
+      const placeId = currentQuest.placeId || `${currentQuest.coordinates.lat.toFixed(6)}_${currentQuest.coordinates.lng.toFixed(6)}`;
+      addVisitedPlace({
+        placeId,
+        placeName: currentQuest.placeName,
+        campaignId: campaign.id,
+        coordinates: currentQuest.coordinates
+      });
+    }
+
     // Award XP based on quest difficulty
     const xpAmount = XP_REWARDS[currentQuest.difficulty] || XP_REWARDS.medium;
     addXP(xpAmount);
@@ -559,32 +577,25 @@ export default function Home() {
     setIsVerifying(false);
   };
 
-  // Open quest location on Google Maps - prefer place name over coordinates
-  const viewQuestArea = (quest: { coordinates?: Coordinates; placeName?: string; title?: string }) => {
-    let searchQuery: string | null = null;
-
-    // Priority 1: Use actual place name from Places API
-    if (quest.placeName) {
-      searchQuery = quest.placeName;
-    }
-    // Priority 2: Use quest title (usually contains the place name)
-    else if (quest.title) {
-      searchQuery = quest.title;
+  // Open quest location on Google Maps - use placeId for exact match, or name with coordinates
+  const viewQuestArea = (quest: { coordinates?: Coordinates; placeName?: string; placeId?: string }) => {
+    // Priority 1: Use place_id for exact match (most reliable)
+    if (quest.placeId && quest.placeId.startsWith('ChIJ')) {
+      window.open(`https://www.google.com/maps/place/?q=place_id:${quest.placeId}`, '_blank');
+      return;
     }
 
-    // Build URL
-    let url: string;
-    if (searchQuery) {
-      // Search by name - Google Maps will find the exact location
-      url = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(searchQuery)}`;
-    } else if (quest.coordinates) {
-      // Fallback: use coordinates
-      url = `https://www.google.com/maps/search/?api=1&query=${quest.coordinates.lat},${quest.coordinates.lng}`;
-    } else {
-      return; // No location data available
+    // Priority 2: Search by name WITH coordinates to anchor the search location
+    if (quest.placeName && quest.coordinates) {
+      const query = `${quest.placeName} @${quest.coordinates.lat},${quest.coordinates.lng}`;
+      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
+      return;
     }
 
-    window.open(url, '_blank');
+    // Priority 3: Just coordinates
+    if (quest.coordinates) {
+      window.open(`https://www.google.com/maps/search/?api=1&query=${quest.coordinates.lat},${quest.coordinates.lng}`, '_blank');
+    }
   };
 
   return (
@@ -1096,6 +1107,19 @@ export default function Home() {
                             </>
                           )}
                         </button>
+
+                        {/* Dev Mode: Skip Quest Button */}
+                        {process.env.NODE_ENV === 'development' && (
+                          <button
+                            className="w-full font-pixel py-2 px-4 rounded-lg border-2 border-dashed border-yellow-500/50 text-yellow-500/70 text-xs hover:bg-yellow-500/10 transition-colors"
+                            onClick={() => {
+                              setResult({ success: true, feedback: '[DEV] Quest skipped for testing' });
+                              setIsVerifying(true);
+                            }}
+                          >
+                            [DEV] SKIP QUEST
+                          </button>
+                        )}
                       </div>
                     </div>
 

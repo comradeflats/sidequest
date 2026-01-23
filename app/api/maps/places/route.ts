@@ -9,7 +9,7 @@ export async function POST(request: Request) {
 
   try {
     const body = await request.json();
-    const { latitude, longitude, radius, includedTypes } = body;
+    const { latitude, longitude, radius, includedTypes, varietyMode } = body;
 
     if (!latitude || !longitude || !radius) {
       return NextResponse.json(
@@ -21,7 +21,8 @@ export async function POST(request: Request) {
     // Google Places API (New) - Nearby Search
     const url = 'https://places.googleapis.com/v1/places:searchNearby';
 
-    const requestBody = {
+    // Build request body
+    const requestBody: Record<string, unknown> = {
       locationRestriction: {
         circle: {
           center: {
@@ -56,6 +57,10 @@ export async function POST(request: Request) {
       maxResultCount: 20,
       languageCode: 'en'
     };
+
+    // Note: We no longer use DISTANCE ranking in variety mode.
+    // The default popularity ranking gives better tourist spots,
+    // while client-side type shuffling and visited tracking provide variety.
 
     const response = await fetch(url, {
       method: 'POST',

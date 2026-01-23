@@ -1,5 +1,6 @@
 import { Coordinates, PlaceData, DistanceRange, DISTANCE_RANGES } from '@/types';
 import { costEstimator } from './cost-estimator';
+import { getVisitedPlaceIds } from './storage';
 
 // Google Places API response types
 interface GooglePlace {
@@ -12,12 +13,37 @@ interface GooglePlace {
 
 /**
  * Find nearby places using Google Places API
+ * @param varietyMode - When true, shuffles types and uses distance ranking for hidden gems
  */
 export async function findNearbyPlaces(
   center: Coordinates,
-  distanceRange: DistanceRange
+  distanceRange: DistanceRange,
+  varietyMode: boolean = false
 ): Promise<PlaceData[]> {
   const config = DISTANCE_RANGES[distanceRange];
+
+  // Base place types
+  const placeTypes = [
+    'tourist_attraction',
+    'park',
+    'museum',
+    'art_gallery',
+    'church',
+    'hindu_temple',
+    'mosque',
+    'synagogue',
+    'shopping_mall',
+    'stadium',
+    'cultural_center',
+    'historical_landmark',
+    'monument',
+    'visitor_center'
+  ];
+
+  // Shuffle types in variety mode to get different results each time
+  const includedTypes = varietyMode
+    ? [...placeTypes].sort(() => Math.random() - 0.5)
+    : placeTypes;
 
   try {
     // Track API call cost
@@ -32,23 +58,8 @@ export async function findNearbyPlaces(
         latitude: center.lat,
         longitude: center.lng,
         radius: config.radiusMeters,
-        // Places API (New) valid types only
-        includedTypes: [
-          'tourist_attraction',
-          'park',
-          'museum',
-          'art_gallery',
-          'church',
-          'hindu_temple',
-          'mosque',
-          'synagogue',
-          'shopping_mall',
-          'stadium',
-          'cultural_center',
-          'historical_landmark',
-          'monument',
-          'visitor_center'
-        ]
+        includedTypes,
+        varietyMode
       })
     });
 
@@ -83,12 +94,14 @@ export async function findNearbyPlaces(
 /**
  * Select diverse, well-spaced quest locations from available places
  * All places must be within maxDistance radius from startCoordinates
+ * @param visitedPlaceIds - Optional set of place IDs to deprioritize (0.5x score penalty)
  */
 export function selectQuestPlaces(
   places: PlaceData[],
   count: number,
   distanceRange: DistanceRange,
-  startCoordinates: Coordinates
+  startCoordinates: Coordinates,
+  visitedPlaceIds?: Set<string>
 ): PlaceData[] {
   if (places.length === 0) {
     return [];
@@ -138,8 +151,13 @@ export function selectQuestPlaces(
     return !selectedTypes.includes(primaryType);
   };
 
-  // Start with a random place from within radius
-  const firstPlace = placesWithinRadius[Math.floor(Math.random() * placesWithinRadius.length)];
+  // Start with a random unvisited place (prefer unvisited, fall back to any)
+  const unvisitedPlaces = visitedPlaceIds
+    ? placesWithinRadius.filter(p => !visitedPlaceIds.has(p.placeId))
+    : placesWithinRadius;
+
+  const candidatePool = unvisitedPlaces.length > 0 ? unvisitedPlaces : placesWithinRadius;
+  const firstPlace = candidatePool[Math.floor(Math.random() * candidatePool.length)];
   selected.push(firstPlace);
 
   // Select remaining places, ensuring diversity and appropriate spacing
@@ -177,8 +195,11 @@ export function selectQuestPlaces(
       // Bonus for type diversity
       const diversityBonus = isDifferentType(place, selected) ? 0.3 : 0;
 
-      // Combined score: prioritize spacing but consider radius and diversity
-      const totalScore = (spacingScore * 0.6) + (radiusScore * 0.1) + diversityBonus;
+      // Penalty for previously visited places (soft exclusion - 0.5x score)
+      const visitedPenalty = visitedPlaceIds?.has(place.placeId) ? 0.5 : 1.0;
+
+      // Combined score: prioritize spacing but consider radius, diversity, and visited status
+      const totalScore = ((spacingScore * 0.6) + (radiusScore * 0.1) + diversityBonus) * visitedPenalty;
 
       if (totalScore > bestScore) {
         bestScore = totalScore;
@@ -240,18 +261,22 @@ export function generateRandomQuestPoints(
 
 /**
  * Get quest locations (tries Places API first, falls back to random if needed)
+ * Automatically excludes/deprioritizes previously visited places
  */
 export async function getQuestLocations(
   center: Coordinates,
   distanceRange: DistanceRange,
   count: number
 ): Promise<Array<PlaceData | Coordinates>> {
+  // Get visited place IDs for exclusion/deprioritization
+  const visitedPlaceIds = getVisitedPlaceIds();
+
   try {
-    // Try to get real places from Places API
-    const places = await findNearbyPlaces(center, distanceRange);
+    // Try to get real places from Places API with variety mode
+    const places = await findNearbyPlaces(center, distanceRange, true);
 
     if (places && places.length >= count) {
-      const selected = selectQuestPlaces(places, count, distanceRange, center);
+      const selected = selectQuestPlaces(places, count, distanceRange, center, visitedPlaceIds);
       if (selected.length >= count) {
         return selected;
       }

@@ -260,6 +260,7 @@ export async function generateCampaign(
         estimatedDuration: durations[i],
         placeName: isPlace ? (location as PlaceData).name : undefined,
         placeTypes: isPlace ? (location as PlaceData).types : undefined,
+        placeId: isPlace ? (location as PlaceData).placeId : undefined,
       };
     });
 

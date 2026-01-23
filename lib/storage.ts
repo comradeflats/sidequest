@@ -1,4 +1,4 @@
-import { Campaign, VerificationResult, JourneyStats, StoredCampaign, PlayerProgress, LEVEL_THRESHOLDS } from '../types';
+import { Campaign, VerificationResult, JourneyStats, StoredCampaign, PlayerProgress, LEVEL_THRESHOLDS, VisitedPlace, VisitedPlacesData, Coordinates } from '../types';
 import {
   saveCampaignImages,
   loadCampaignImages,
@@ -11,7 +11,9 @@ const CURRENT_CAMPAIGN_KEY = 'current_campaign_id';
 const CAMPAIGN_HISTORY_KEY = 'campaign_history';
 const PLAYER_PROGRESS_KEY = 'player_progress';
 const QUEST_PREFERENCES_KEY = 'quest_preferences';
+const VISITED_PLACES_KEY = 'visited_places';
 const MAX_HISTORY_SIZE = 10;
+const MAX_VISITED_PLACES = 500;
 
 // Quest type preferences
 export interface QuestTypePreferences {
@@ -425,4 +427,155 @@ export function updateQuestTypePreference(
   const updated = { ...current, [key]: value };
   saveQuestTypePreferences(updated);
   return updated;
+}
+
+// ============================================
+// Visited Places Tracking
+// ============================================
+
+/**
+ * Get all visited place IDs as a Set for fast O(1) lookup
+ */
+export function getVisitedPlaceIds(): Set<string> {
+  try {
+    const data = localStorage.getItem(VISITED_PLACES_KEY);
+    if (!data) return new Set();
+
+    const visitedData: VisitedPlacesData = JSON.parse(data);
+    return new Set(visitedData.places.map(p => p.placeId));
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Get all visited places with full data for UI display
+ */
+export function getVisitedPlaces(): VisitedPlace[] {
+  try {
+    const data = localStorage.getItem(VISITED_PLACES_KEY);
+    if (!data) return [];
+
+    const visitedData: VisitedPlacesData = JSON.parse(data);
+    // Parse dates
+    return visitedData.places.map(p => ({
+      ...p,
+      visitedAt: new Date(p.visitedAt)
+    }));
+  } catch {
+    return [];
+  }
+}
+
+/**
+ * Add a visited place (called on quest completion)
+ * Uses LRU eviction when exceeding MAX_VISITED_PLACES
+ */
+export function addVisitedPlace(place: {
+  placeId: string;
+  placeName: string;
+  campaignId: string;
+  coordinates: Coordinates;
+}): void {
+  try {
+    const current = getVisitedPlaces();
+
+    // Check if place already exists (update timestamp if so)
+    const existingIndex = current.findIndex(p => p.placeId === place.placeId);
+
+    const newPlace: VisitedPlace = {
+      ...place,
+      visitedAt: new Date()
+    };
+
+    let updatedPlaces: VisitedPlace[];
+
+    if (existingIndex >= 0) {
+      // Move to end (most recent) and update timestamp
+      current.splice(existingIndex, 1);
+      updatedPlaces = [...current, newPlace];
+    } else {
+      // Add new place
+      updatedPlaces = [...current, newPlace];
+    }
+
+    // LRU eviction: remove oldest entries if over limit
+    if (updatedPlaces.length > MAX_VISITED_PLACES) {
+      updatedPlaces = updatedPlaces.slice(-MAX_VISITED_PLACES);
+    }
+
+    const visitedData: VisitedPlacesData = {
+      places: updatedPlaces,
+      lastUpdated: new Date()
+    };
+
+    localStorage.setItem(VISITED_PLACES_KEY, JSON.stringify(visitedData));
+  } catch {
+    // Failed to save visited place
+  }
+}
+
+/**
+ * Clear all visited places (user-triggered reset)
+ */
+export function clearVisitedPlaces(): void {
+  try {
+    localStorage.removeItem(VISITED_PLACES_KEY);
+  } catch {
+    // Failed to clear visited places
+  }
+}
+
+/**
+ * Get count of visited places
+ */
+export function getVisitedPlacesCount(): number {
+  try {
+    const data = localStorage.getItem(VISITED_PLACES_KEY);
+    if (!data) return 0;
+
+    const visitedData: VisitedPlacesData = JSON.parse(data);
+    return visitedData.places.length;
+  } catch {
+    return 0;
+  }
+}
+
+/**
+ * Migrate visited places from existing campaign history
+ * Call once on app initialization to populate from past campaigns
+ */
+export async function migrateVisitedPlacesFromHistory(): Promise<number> {
+  try {
+    // Check if migration already done
+    const existing = getVisitedPlaces();
+    if (existing.length > 0) {
+      return 0; // Already have data, skip migration
+    }
+
+    const history = await getCampaignHistory();
+    let migratedCount = 0;
+
+    for (const stored of history) {
+      for (const quest of stored.campaign.quests) {
+        // Only add places that have placeId (from Places API, not random coords)
+        if (quest.coordinates && quest.placeName) {
+          // Create a pseudo placeId from coordinates if not available
+          const placeId = `${quest.coordinates.lat.toFixed(6)}_${quest.coordinates.lng.toFixed(6)}`;
+
+          addVisitedPlace({
+            placeId,
+            placeName: quest.placeName,
+            campaignId: stored.campaign.id,
+            coordinates: quest.coordinates
+          });
+          migratedCount++;
+        }
+      }
+    }
+
+    return migratedCount;
+  } catch {
+    return 0;
+  }
 }
