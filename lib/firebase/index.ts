@@ -9,6 +9,7 @@ export {
   signOut,
   onAuthChange,
   getCurrentUser,
+  checkRedirectResult,
   PopupBlockedError,
 } from "./auth";
 

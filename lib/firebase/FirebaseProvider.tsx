@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { User, updateProfile } from "firebase/auth";
-import { onAuthChange } from "./auth";
+import { onAuthChange, checkRedirectResult, signOut, signInWithGoogle } from "./auth";
 import { initAnalytics } from "./config";
 import { getUserProfile, saveUserProfile, UserProfile } from "./firestore";
 
@@ -75,6 +75,27 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     // Initialize analytics
     initAnalytics();
+
+    // Check for redirect result (handles mobile Google sign-in return)
+    const handleRedirectResult = async () => {
+      try {
+        await checkRedirectResult();
+      } catch (error: any) {
+        // Handle credential-already-in-use from redirect (Google account already linked)
+        if (error.code === 'auth/credential-already-in-use') {
+          console.log('Google account already linked, signing in fresh...');
+          try {
+            await signOut();
+            await signInWithGoogle();
+          } catch (e) {
+            console.error('Failed to sign in after credential conflict:', e);
+          }
+        } else {
+          console.error('Redirect result error:', error);
+        }
+      }
+    };
+    handleRedirectResult();
 
     // Listen for auth state changes
     const unsubscribe = onAuthChange(async (authUser) => {
