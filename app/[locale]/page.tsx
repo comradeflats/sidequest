@@ -20,6 +20,7 @@ import LoadingProgress from '@/components/LoadingProgress';
 import QuestPreview from '@/components/QuestPreview';
 import XPHeader from '@/components/XPHeader';
 import ThinkingPanel from '@/components/ThinkingPanel';
+import AuthButton from '@/components/AuthButton';
 import {
   getCurrentCampaignId,
   loadCampaign,
@@ -601,21 +602,26 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-black text-emerald-400 p-6 selection:bg-emerald-900 selection:text-emerald-100">
       {/* Fixed Header Buttons */}
+      {/* Auth Button - Always visible in top right */}
+      <div className="fixed top-4 right-4 z-40 flex items-center gap-2">
+        {campaign && (
+          <button
+            onClick={() => setShowQuestBook(true)}
+            className="w-14 h-14 bg-black/90 rounded-full border border-adventure-gold/30 shadow-lg hover:border-adventure-gold hover:bg-black transition-colors flex items-center justify-center"
+            aria-label="Open Quest Book"
+          >
+            <BookOpen className="w-6 h-6 text-adventure-gold" />
+          </button>
+        )}
+        <AuthButton />
+      </div>
+
       {campaign && (
         <>
           {/* XP Header - Fixed Position Left */}
           <div className="fixed top-4 left-4 z-40">
             <XPHeader onXPGain={xpGain} />
           </div>
-
-          {/* Quest Book Button - Fixed Position Right */}
-          <button
-            onClick={() => setShowQuestBook(true)}
-            className="fixed top-4 right-4 z-40 w-14 h-14 bg-black/90 rounded-full border border-adventure-gold/30 shadow-lg hover:border-adventure-gold hover:bg-black transition-colors flex items-center justify-center"
-            aria-label="Open Quest Book"
-          >
-            <BookOpen className="w-6 h-6 text-adventure-gold" />
-          </button>
         </>
       )}
 

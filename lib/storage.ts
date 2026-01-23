@@ -579,3 +579,64 @@ export async function migrateVisitedPlacesFromHistory(): Promise<number> {
     return 0;
   }
 }
+
+// ============================================
+// Local Data Detection (for cloud sync)
+// ============================================
+
+/**
+ * Check if user has any local data that could be synced to cloud
+ * Used to determine if we should offer data transfer after sign-in
+ */
+export function hasAnyData(): boolean {
+  try {
+    const progress = getPlayerProgress();
+    const historyData = localStorage.getItem(CAMPAIGN_HISTORY_KEY);
+    const currentCampaignId = localStorage.getItem(CURRENT_CAMPAIGN_KEY);
+
+    // Check if player has any XP or completed quests
+    const hasProgress = progress.totalXP > 0 || progress.questsCompleted > 0;
+
+    // Check if there are any saved campaigns
+    const hasHistory = historyData ? JSON.parse(historyData).length > 0 : false;
+
+    // Check if there's an active campaign
+    const hasActiveCampaign = !!currentCampaignId;
+
+    return hasProgress || hasHistory || hasActiveCampaign;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Get a summary of local data for display in transfer modal
+ */
+export function getLocalDataSummary(): {
+  totalXP: number;
+  questsCompleted: number;
+  campaignCount: number;
+  hasActiveCampaign: boolean;
+} {
+  try {
+    const progress = getPlayerProgress();
+    const historyData = localStorage.getItem(CAMPAIGN_HISTORY_KEY);
+    const currentCampaignId = localStorage.getItem(CURRENT_CAMPAIGN_KEY);
+
+    const campaignCount = historyData ? JSON.parse(historyData).length : 0;
+
+    return {
+      totalXP: progress.totalXP,
+      questsCompleted: progress.questsCompleted,
+      campaignCount,
+      hasActiveCampaign: !!currentCampaignId,
+    };
+  } catch {
+    return {
+      totalXP: 0,
+      questsCompleted: 0,
+      campaignCount: 0,
+      hasActiveCampaign: false,
+    };
+  }
+}

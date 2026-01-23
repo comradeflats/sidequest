@@ -3,6 +3,7 @@ import { Geist, Geist_Mono, Press_Start_2P } from "next/font/google";
 import { GoogleAnalytics } from "@next/third-parties/google";
 import "./globals.css";
 import CostIndicator from "@/components/CostIndicator";
+import { FirebaseProvider } from "@/lib/firebase";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -35,8 +36,10 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} ${pressStart2P.variable} antialiased`}
       >
-        {children}
-        <CostIndicator />
+        <FirebaseProvider>
+          {children}
+          <CostIndicator />
+        </FirebaseProvider>
       </body>
       <GoogleAnalytics gaId={process.env.NEXT_PUBLIC_GA_MEASUREMENT_ID || ''} />
     </html>
