@@ -191,7 +191,7 @@ export default function AuthButton({ compact = false }: AuthButtonProps) {
   if (loading) {
     return (
       <div className={`flex flex-col items-center ${compact ? '' : 'gap-1'}`}>
-        <div className="w-10 h-10 bg-black/90 rounded-full border border-zinc-700 flex items-center justify-center">
+        <div className="w-10 h-10 bg-black rounded-full border border-white/20 flex items-center justify-center">
           <Loader2 className="w-4 h-4 text-gray-500 animate-spin" />
         </div>
         {!compact && <span className="text-[10px] text-gray-500">Loading...</span>}
@@ -205,13 +205,7 @@ export default function AuthButton({ compact = false }: AuthButtonProps) {
         {/* Main Button */}
         <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors relative ${
-            isAuthenticated
-              ? user?.isAnonymous
-                ? 'bg-black/90 border-yellow-500/50 hover:border-yellow-500'
-                : 'bg-black/90 border-adventure-emerald/50 hover:border-adventure-emerald'
-              : 'bg-black/90 border-zinc-700 hover:border-zinc-500'
-          }`}
+          className="w-10 h-10 rounded-full flex items-center justify-center transition-colors relative bg-black border border-white/20 hover:border-white/40"
         >
           {isAuthenticated ? (
             user?.photoURL ? (

@@ -85,7 +85,7 @@ export default function CollapsibleToolbar({
             exit={{ opacity: 0, scale: 0.8 }}
             transition={{ duration: 0.2 }}
             onClick={handleToggle}
-            className="w-10 h-10 bg-black/90 rounded-full border border-adventure-gold/30 shadow-lg hover:border-adventure-gold hover:bg-black transition-colors flex items-center justify-center"
+            className="w-10 h-10 bg-black rounded-full shadow-lg border border-white/20 hover:border-white/40 transition-colors flex items-center justify-center"
             aria-label="Open toolbar"
           >
             <LayoutGrid className="w-5 h-5 text-adventure-gold" />
@@ -119,7 +119,7 @@ export default function CollapsibleToolbar({
                 animate={{ opacity: 1, scale: 1 }}
                 transition={{ delay: 0.1 }}
                 onClick={handleQuestBookClick}
-                className="w-10 h-10 bg-black/50 rounded-full border border-adventure-gold/20 hover:border-adventure-gold hover:bg-black/80 transition-colors flex items-center justify-center"
+                className="w-10 h-10 bg-black rounded-full border border-white/20 hover:border-white/40 transition-colors flex items-center justify-center"
                 aria-label="Open Quest Book"
               >
                 <BookOpen className="w-5 h-5 text-adventure-gold" />

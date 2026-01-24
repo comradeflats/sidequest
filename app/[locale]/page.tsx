@@ -577,24 +577,23 @@ export default function Home() {
     setIsVerifying(false);
   };
 
-  // Open quest location on Google Maps - use placeId for exact match, or name with coordinates
+  // Open quest location on Google Maps - use name+coordinates for reliable results
   const viewQuestArea = (quest: { coordinates?: Coordinates; placeName?: string; placeId?: string }) => {
-    // Priority 1: Use place_id for exact match (most reliable)
-    if (quest.placeId && quest.placeId.startsWith('ChIJ')) {
-      window.open(`https://www.google.com/maps/place/?q=place_id:${quest.placeId}`, '_blank');
+    // Priority 1: Search by name WITH place_id for exact match (most reliable)
+    if (quest.placeName && quest.placeId) {
+      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(quest.placeName)}&query_place_id=${quest.placeId}`, '_blank');
       return;
     }
 
     // Priority 2: Search by name WITH coordinates to anchor the search location
     if (quest.placeName && quest.coordinates) {
-      const query = `${quest.placeName} @${quest.coordinates.lat},${quest.coordinates.lng}`;
-      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`, '_blank');
+      window.open(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(quest.placeName)}`, '_blank');
       return;
     }
 
-    // Priority 3: Just coordinates
+    // Priority 3: Just coordinates - open at that location
     if (quest.coordinates) {
-      window.open(`https://www.google.com/maps/search/?api=1&query=${quest.coordinates.lat},${quest.coordinates.lng}`, '_blank');
+      window.open(`https://www.google.com/maps/@${quest.coordinates.lat},${quest.coordinates.lng},17z`, '_blank');
     }
   };
 

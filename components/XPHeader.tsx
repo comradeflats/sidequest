@@ -28,6 +28,7 @@ export default function XPHeader({ onXPGain }: XPHeaderProps) {
   const [gainAmount, setGainAmount] = useState(0);
   const [showLevelUp, setShowLevelUp] = useState(false);
   const [previousLevel, setPreviousLevel] = useState(1);
+  const [showLevel, setShowLevel] = useState(false); // Toggle between XP and Level display
 
   // Load progress on mount
   useEffect(() => {
@@ -70,10 +71,10 @@ export default function XPHeader({ onXPGain }: XPHeaderProps) {
   const isMaxLevel = progress.level >= LEVEL_THRESHOLDS.length;
   const progressPercent = isMaxLevel ? 100 : xpInfo.progress;
 
-  // SVG circle parameters - 40px with 5px stroke
-  const circleSize = 40;
-  const strokeWidth = 5;
-  const radius = (circleSize - strokeWidth) / 2;
+  // SVG circle parameters - 40px container with 3px stroke at outer edge
+  const containerSize = 40;
+  const strokeWidth = 3;
+  const radius = (containerSize - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   const strokeDashoffset = circumference - (progressPercent / 100) * circumference;
 
@@ -97,8 +98,12 @@ export default function XPHeader({ onXPGain }: XPHeaderProps) {
         )}
       </AnimatePresence>
 
-      {/* XP Circle */}
-      <div className="relative">
+      {/* XP Circle - Tappable to toggle between XP and Level */}
+      <button
+        className="relative cursor-pointer active:scale-95 transition-transform"
+        onClick={() => setShowLevel(!showLevel)}
+        aria-label={showLevel ? 'Show XP' : 'Show Level'}
+      >
         {/* XP Gain Animation - Floats to the right of circle */}
         <AnimatePresence>
           {showXPGain && (
@@ -114,25 +119,25 @@ export default function XPHeader({ onXPGain }: XPHeaderProps) {
         </AnimatePresence>
 
         {/* Circle with SVG Progress Ring */}
-        <div className="relative" style={{ width: circleSize, height: circleSize }}>
+        <div className="relative" style={{ width: containerSize, height: containerSize }}>
           <svg
             className="absolute inset-0 -rotate-90"
-            width={circleSize}
-            height={circleSize}
+            width={containerSize}
+            height={containerSize}
           >
-            {/* Background circle */}
+            {/* Background circle - light border visible when progress < 100% */}
             <circle
-              cx={circleSize / 2}
-              cy={circleSize / 2}
+              cx={containerSize / 2}
+              cy={containerSize / 2}
               r={radius}
               fill="transparent"
-              stroke="rgba(39, 39, 42, 1)"
+              stroke="rgba(255,255,255,0.2)"
               strokeWidth={strokeWidth}
             />
             {/* Progress circle - Green gradient */}
             <motion.circle
-              cx={circleSize / 2}
-              cy={circleSize / 2}
+              cx={containerSize / 2}
+              cy={containerSize / 2}
               r={radius}
               fill="transparent"
               stroke="url(#greenGradient)"
@@ -152,14 +157,39 @@ export default function XPHeader({ onXPGain }: XPHeaderProps) {
             </defs>
           </svg>
 
-          {/* Center content - XP value */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 rounded-full border border-adventure-emerald/30">
-            <span className="text-xs font-bold text-adventure-emerald leading-none">
-              {formatXP(progress.totalXP)}
-            </span>
+          {/* Center content - inset slightly from ring, toggles between XP and Level */}
+          <div className="absolute inset-[3px] flex flex-col items-center justify-center bg-black rounded-full">
+            <AnimatePresence mode="wait">
+              {showLevel ? (
+                <motion.div
+                  key="level"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.15 }}
+                  className="flex flex-col items-center"
+                >
+                  <span className="text-[8px] text-gray-400 uppercase leading-none">LV</span>
+                  <span className="text-sm font-bold text-adventure-emerald leading-none">
+                    {progress.level}
+                  </span>
+                </motion.div>
+              ) : (
+                <motion.span
+                  key="xp"
+                  initial={{ opacity: 0, scale: 0.8 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  exit={{ opacity: 0, scale: 0.8 }}
+                  transition={{ duration: 0.15 }}
+                  className="text-xs font-bold text-adventure-emerald leading-none"
+                >
+                  {formatXP(progress.totalXP)}
+                </motion.span>
+              )}
+            </AnimatePresence>
           </div>
         </div>
-      </div>
+      </button>
     </div>
   );
 }
