@@ -61,19 +61,26 @@ export const signInAnonymous = async (): Promise<User> => {
 
 // Sign in with Google (uses redirect on mobile, popup on desktop)
 export const signInWithGoogle = async (): Promise<User> => {
+  console.log('[Auth] signInWithGoogle - isMobile:', isMobile());
+
   if (isMobile()) {
     // Mobile: use redirect (more reliable, no popup issues)
+    console.log('[Auth] Setting redirect pending flag');
     setRedirectPending();
+    console.log('[Auth] Calling signInWithRedirect...');
     await signInWithRedirect(auth, googleProvider);
     // Won't return - page redirects. Result handled by checkRedirectResult
     return null as any;
   }
 
   // Desktop: try popup
+  console.log('[Auth] Using popup flow for desktop');
   try {
     const result = await signInWithPopup(auth, googleProvider);
+    console.log('[Auth] Popup sign-in successful:', result.user.uid);
     return result.user;
   } catch (error: any) {
+    console.error('[Auth] Popup sign-in error:', error.code, error.message);
     if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
       throw new PopupBlockedError();
     }
@@ -114,9 +121,15 @@ export const linkAnonymousToGoogle = async (): Promise<User> => {
 // Check for redirect result (call on app initialization for mobile auth)
 export const checkRedirectResult = async (): Promise<User | null> => {
   try {
+    console.log('[Auth] checkRedirectResult - auth.currentUser:', auth.currentUser?.uid);
     console.log('[Auth] Calling getRedirectResult...');
     const result = await getRedirectResult(auth);
-    console.log('[Auth] getRedirectResult returned:', result ? `user ${result.user.uid} (anon: ${result.user.isAnonymous})` : 'null');
+    console.log('[Auth] Result details:', {
+      hasResult: !!result,
+      userId: result?.user?.uid,
+      email: result?.user?.email,
+      operationType: result?.operationType
+    });
     return result?.user || null;
   } catch (error: any) {
     console.error('[Auth] getRedirectResult error:', error.code, error.message, error);

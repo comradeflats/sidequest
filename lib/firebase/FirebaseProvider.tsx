@@ -79,6 +79,11 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
     let unsubscribe: (() => void) | undefined;
 
     const initAuth = async () => {
+      // Log initial state for debugging
+      console.log('[FirebaseProvider] initAuth - isRedirectPending:', isRedirectPending());
+      console.log('[FirebaseProvider] localStorage redirect flag:', typeof window !== 'undefined' ? localStorage.getItem('firebase_auth_redirect_pending') : 'N/A');
+      console.log('[FirebaseProvider] Current URL:', typeof window !== 'undefined' ? window.location.href : 'N/A');
+
       // Check for pending redirect FIRST (mobile Google sign-in return)
       // This MUST complete before setting up the auth listener to avoid race condition
       if (isRedirectPending()) {
@@ -101,6 +106,21 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
           }
         } finally {
           clearRedirectPending();
+        }
+      } else {
+        // IMPORTANT FIX: Also check getRedirectResult even when flag is not set
+        // The localStorage flag may be lost if the page reloads differently
+        console.log('[FirebaseProvider] No redirect flag - checking anyway...');
+        try {
+          const unexpectedResult = await checkRedirectResult();
+          if (unexpectedResult) {
+            console.log('[FirebaseProvider] FOUND redirect result without flag!', unexpectedResult.uid);
+          } else {
+            console.log('[FirebaseProvider] No redirect result found (expected)');
+          }
+        } catch (e: any) {
+          // Expected - no redirect result or error
+          console.log('[FirebaseProvider] checkRedirectResult without flag - error:', e.code || e.message);
         }
       }
 

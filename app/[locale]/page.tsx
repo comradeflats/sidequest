@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Compass, Zap, Map, CheckCircle, XCircle, Camera, Video, Mic, Navigation, MessageSquare, ExternalLink, RefreshCw, Crosshair, BookOpen } from 'lucide-react';
+import { MapPin, Compass, Zap, CheckCircle, XCircle, Camera, Video, Mic, Navigation, MessageSquare, ExternalLink, RefreshCw, Crosshair } from 'lucide-react';
 import { generateCampaign, verifyMedia, verifyMediaWithAppeal } from '@/lib/game-logic';
 import { geocodeLocation } from '@/lib/location';
 import { generateQuestImage } from '@/lib/gemini';
@@ -18,9 +18,8 @@ import JourneyStatsCard from '@/components/JourneyStatsCard';
 import QuestBook from '@/components/QuestBook';
 import LoadingProgress from '@/components/LoadingProgress';
 import QuestPreview from '@/components/QuestPreview';
-import XPHeader from '@/components/XPHeader';
 import ThinkingPanel from '@/components/ThinkingPanel';
-import AuthButton from '@/components/AuthButton';
+import CollapsibleToolbar from '@/components/CollapsibleToolbar';
 import {
   getCurrentCampaignId,
   loadCampaign,
@@ -603,29 +602,12 @@ export default function Home() {
     <main className="min-h-screen bg-black text-emerald-400 p-6 selection:bg-emerald-900 selection:text-emerald-100">
       {/* Unified Header Bar */}
       <div className="fixed top-0 left-0 right-0 z-40 px-4 py-3">
-        <div className="flex items-center justify-between max-w-md mx-auto">
-          {/* Left: XP/Level (only when campaign active) */}
-          <div className="flex-shrink-0">
-            {campaign ? (
-              <XPHeader onXPGain={xpGain} />
-            ) : (
-              <div className="w-14" />
-            )}
-          </div>
-
-          {/* Right: Quest Book + Auth */}
-          <div className="flex items-center gap-2">
-            {campaign && (
-              <button
-                onClick={() => setShowQuestBook(true)}
-                className="w-10 h-10 bg-black/90 rounded-full border border-adventure-gold/30 shadow-lg hover:border-adventure-gold hover:bg-black transition-colors flex items-center justify-center"
-                aria-label="Open Quest Book"
-              >
-                <BookOpen className="w-5 h-5 text-adventure-gold" />
-              </button>
-            )}
-            <AuthButton compact />
-          </div>
+        <div className="flex items-center justify-end max-w-md mx-auto">
+          <CollapsibleToolbar
+            campaign={campaign}
+            onXPGain={xpGain}
+            onOpenQuestBook={() => setShowQuestBook(true)}
+          />
         </div>
       </div>
 

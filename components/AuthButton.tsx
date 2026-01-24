@@ -9,6 +9,22 @@ import UsernameModal from './UsernameModal';
 // Debug: detect mobile
 const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
+// Persistent debug logging that survives redirects
+const logToSession = (msg: string) => {
+  if (typeof window === 'undefined') return;
+  const key = 'auth_debug_log';
+  const existing = sessionStorage.getItem(key) || '';
+  const timestamp = new Date().toISOString().slice(11, 19);
+  sessionStorage.setItem(key, (existing + `${timestamp}: ${msg}\n`).slice(-3000));
+  console.log(`[AuthButton] ${msg}`);
+};
+
+// Get session debug log
+const getSessionLog = (): string => {
+  if (typeof window === 'undefined') return '';
+  return sessionStorage.getItem('auth_debug_log') || '';
+};
+
 interface AuthButtonProps {
   compact?: boolean;
 }
@@ -32,8 +48,16 @@ export default function AuthButton({ compact = false }: AuthButtonProps) {
   const [debugLog, setDebugLog] = useState<string[]>([]);
 
   const addDebug = (msg: string) => {
+    logToSession(msg);
     setDebugLog(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${msg}`]);
   };
+
+  // Log auth state changes for debugging
+  useEffect(() => {
+    if (!loading) {
+      logToSession(`Auth state: ${user ? `User ${user.uid} (anon: ${user.isAnonymous})` : 'No user'}`);
+    }
+  }, [user, loading]);
 
   // Show username modal when profile setup is needed (after anonymous sign-in)
   useEffect(() => {
@@ -400,11 +424,14 @@ export default function AuthButton({ compact = false }: AuthButtonProps) {
 
       {/* Debug Panel - Remove after fixing */}
       {debugLog.length > 0 && (
-        <div className="fixed bottom-4 left-4 right-4 bg-black/95 border border-yellow-500 rounded-lg p-3 z-[100] max-h-40 overflow-auto">
+        <div className="fixed bottom-4 left-4 right-4 bg-black/95 border border-yellow-500 rounded-lg p-3 z-[100] max-h-48 overflow-auto">
           <div className="text-yellow-500 text-xs font-bold mb-1">Debug Log (mobile: {isMobile ? 'YES' : 'NO'})</div>
           {debugLog.map((log, i) => (
             <div key={i} className="text-white text-xs font-mono">{log}</div>
           ))}
+          {/* Session log persists across redirects */}
+          <div className="text-gray-400 text-xs font-bold mt-2 mb-1 border-t border-yellow-500/30 pt-2">Session Log (persists):</div>
+          <pre className="text-gray-300 text-xs font-mono whitespace-pre-wrap">{getSessionLog()}</pre>
         </div>
       )}
     </div>
