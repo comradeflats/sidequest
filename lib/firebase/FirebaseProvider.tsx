@@ -2,7 +2,7 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
 import { User, updateProfile } from "firebase/auth";
-import { onAuthChange, checkRedirectResult, signOut, signInWithGoogle } from "./auth";
+import { onAuthChange, checkRedirectResult, signOut, signInWithGoogle, isRedirectPending, clearRedirectPending } from "./auth";
 import { initAnalytics } from "./config";
 import { getUserProfile, saveUserProfile, UserProfile } from "./firestore";
 
@@ -76,71 +76,83 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
     // Initialize analytics
     initAnalytics();
 
-    // Check for redirect result (handles mobile Google sign-in return)
-    const handleRedirectResult = async () => {
-      try {
-        console.log('[FirebaseProvider] Checking redirect result...');
-        const user = await checkRedirectResult();
-        console.log('[FirebaseProvider] Redirect result:', user ? `User ${user.uid}` : 'No user');
-      } catch (error: any) {
-        console.error('[FirebaseProvider] Redirect error:', error.code, error.message);
-        // Handle credential-already-in-use from redirect (Google account already linked)
-        if (error.code === 'auth/credential-already-in-use') {
-          console.log('[FirebaseProvider] Credential in use, signing out and retrying...');
-          try {
-            await signOut();
-            await signInWithGoogle();
-          } catch (e: any) {
-            console.error('[FirebaseProvider] Failed to sign in after credential conflict:', e.code, e.message);
-          }
-        }
-      }
-    };
-    handleRedirectResult();
+    let unsubscribe: (() => void) | undefined;
 
-    // Listen for auth state changes
-    const unsubscribe = onAuthChange(async (authUser) => {
-      setUser(authUser);
-
-      if (authUser) {
-        // User is signed in - cloud mode
-        setStorageMode('cloud');
-        setSyncStatus('syncing');
-
+    const initAuth = async () => {
+      // Check for pending redirect FIRST (mobile Google sign-in return)
+      // This MUST complete before setting up the auth listener to avoid race condition
+      if (isRedirectPending()) {
+        console.log('[FirebaseProvider] Redirect pending, checking result...');
         try {
-          // Try to get existing profile from Firestore
-          const profile = await getUserProfile(authUser.uid);
-
-          if (profile) {
-            // Existing user with profile
-            setDisplayName(profile.displayName);
-            setNeedsProfileSetup(false);
-          } else {
-            // New user - show profile setup modal
-            // Pre-fill with Google name if available, but let them customize
-            setDisplayName(authUser.displayName || null);
-            setNeedsProfileSetup(true);
+          const redirectUser = await checkRedirectResult();
+          console.log('[FirebaseProvider] Redirect result:', redirectUser ? `User ${redirectUser.uid} (anon: ${redirectUser.isAnonymous})` : 'No user');
+        } catch (error: any) {
+          console.error('[FirebaseProvider] Redirect error:', error.code, error.message);
+          // Handle credential-already-in-use from redirect (Google account already linked)
+          if (error.code === 'auth/credential-already-in-use') {
+            console.log('[FirebaseProvider] Credential in use, signing out and retrying...');
+            try {
+              await signOut();
+              await signInWithGoogle();
+              return; // Will redirect again, don't set up listener yet
+            } catch (e: any) {
+              console.error('[FirebaseProvider] Failed to sign in after credential conflict:', e.code, e.message);
+            }
           }
-
-          setSyncStatus('synced');
-        } catch (error) {
-          console.error('Error loading user profile:', error);
-          // Fall back to Auth display name if Firestore fails
-          setDisplayName(authUser.displayName);
-          setSyncStatus('error');
+        } finally {
+          clearRedirectPending();
         }
-      } else {
-        // User signed out - back to local mode
-        setStorageMode('local');
-        setSyncStatus('offline');
-        setDisplayName(null);
-        setNeedsProfileSetup(false);
       }
 
-      setLoading(false);
-    });
+      // NOW set up auth state listener (redirect is already handled)
+      unsubscribe = onAuthChange(async (authUser) => {
+        console.log('[FirebaseProvider] Auth state changed:', authUser ? `User ${authUser.uid} (anon: ${authUser.isAnonymous})` : 'No user');
+        setUser(authUser);
 
-    return () => unsubscribe();
+        if (authUser) {
+          // User is signed in - cloud mode
+          setStorageMode('cloud');
+          setSyncStatus('syncing');
+
+          try {
+            // Try to get existing profile from Firestore
+            const profile = await getUserProfile(authUser.uid);
+
+            if (profile) {
+              // Existing user with profile
+              setDisplayName(profile.displayName);
+              setNeedsProfileSetup(false);
+            } else {
+              // New user - show profile setup modal
+              // Pre-fill with Google name if available, but let them customize
+              setDisplayName(authUser.displayName || null);
+              setNeedsProfileSetup(true);
+            }
+
+            setSyncStatus('synced');
+          } catch (error) {
+            console.error('Error loading user profile:', error);
+            // Fall back to Auth display name if Firestore fails
+            setDisplayName(authUser.displayName);
+            setSyncStatus('error');
+          }
+        } else {
+          // User signed out - back to local mode
+          setStorageMode('local');
+          setSyncStatus('offline');
+          setDisplayName(null);
+          setNeedsProfileSetup(false);
+        }
+
+        setLoading(false);
+      });
+    };
+
+    initAuth();
+
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
   }, []);
 
   return (

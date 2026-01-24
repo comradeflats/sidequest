@@ -14,6 +14,28 @@ import { auth } from "./config";
 
 const googleProvider = new GoogleAuthProvider();
 
+// Redirect tracking - used to detect when returning from Google sign-in redirect
+const REDIRECT_PENDING_KEY = 'firebase_auth_redirect_pending';
+
+export const setRedirectPending = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(REDIRECT_PENDING_KEY, 'true');
+  }
+};
+
+export const isRedirectPending = (): boolean => {
+  if (typeof window !== 'undefined') {
+    return localStorage.getItem(REDIRECT_PENDING_KEY) === 'true';
+  }
+  return false;
+};
+
+export const clearRedirectPending = () => {
+  if (typeof window !== 'undefined') {
+    localStorage.removeItem(REDIRECT_PENDING_KEY);
+  }
+};
+
 // Detect mobile device
 const isMobile = (): boolean => {
   if (typeof window === 'undefined') return false;
@@ -41,6 +63,7 @@ export const signInAnonymous = async (): Promise<User> => {
 export const signInWithGoogle = async (): Promise<User> => {
   if (isMobile()) {
     // Mobile: use redirect (more reliable, no popup issues)
+    setRedirectPending();
     await signInWithRedirect(auth, googleProvider);
     // Won't return - page redirects. Result handled by checkRedirectResult
     return null as any;
@@ -70,6 +93,7 @@ export const linkAnonymousToGoogle = async (): Promise<User> => {
 
   if (isMobile()) {
     // Mobile: use redirect (more reliable, no popup issues)
+    setRedirectPending();
     await linkWithRedirect(currentUser, googleProvider);
     // Won't return - page redirects. Result handled by checkRedirectResult
     return null as any;
@@ -90,15 +114,14 @@ export const linkAnonymousToGoogle = async (): Promise<User> => {
 // Check for redirect result (call on app initialization for mobile auth)
 export const checkRedirectResult = async (): Promise<User | null> => {
   try {
+    console.log('[Auth] Calling getRedirectResult...');
     const result = await getRedirectResult(auth);
+    console.log('[Auth] getRedirectResult returned:', result ? `user ${result.user.uid} (anon: ${result.user.isAnonymous})` : 'null');
     return result?.user || null;
   } catch (error: any) {
-    console.error('Redirect result error:', error);
-    // Re-throw credential-already-in-use so it can be handled
-    if (error.code === 'auth/credential-already-in-use') {
-      throw error;
-    }
-    return null;
+    console.error('[Auth] getRedirectResult error:', error.code, error.message, error);
+    // Re-throw all errors so they can be handled by the caller
+    throw error;
   }
 };
 
