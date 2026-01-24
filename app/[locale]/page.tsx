@@ -609,7 +609,7 @@ export default function Home() {
             {campaign ? (
               <XPHeader onXPGain={xpGain} />
             ) : (
-              <div className="w-14" /> {/* Spacer for balance */}
+              <div className="w-14" />
             )}
           </div>
 
