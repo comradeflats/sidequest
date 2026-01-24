@@ -9,7 +9,11 @@ import UsernameModal from './UsernameModal';
 // Debug: detect mobile
 const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
 
-export default function AuthButton() {
+interface AuthButtonProps {
+  compact?: boolean;
+}
+
+export default function AuthButton({ compact = false }: AuthButtonProps) {
   const {
     user,
     loading,
@@ -162,22 +166,22 @@ export default function AuthButton() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center gap-1">
+      <div className={`flex flex-col items-center ${compact ? '' : 'gap-1'}`}>
         <div className="w-10 h-10 bg-black/90 rounded-full border border-zinc-700 flex items-center justify-center">
           <Loader2 className="w-4 h-4 text-gray-500 animate-spin" />
         </div>
-        <span className="text-[10px] text-gray-500">Loading...</span>
+        {!compact && <span className="text-[10px] text-gray-500">Loading...</span>}
       </div>
     );
   }
 
   return (
     <div className="relative">
-      <div className="flex flex-col items-center gap-1">
+      <div className={`flex flex-col items-center ${compact ? '' : 'gap-1'}`}>
         {/* Main Button */}
         <button
           onClick={() => setIsMenuOpen(!isMenuOpen)}
-          className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors ${
+          className={`w-10 h-10 rounded-full border flex items-center justify-center transition-colors relative ${
             isAuthenticated
               ? user?.isAnonymous
                 ? 'bg-black/90 border-yellow-500/50 hover:border-yellow-500'
@@ -204,15 +208,22 @@ export default function AuthButton() {
               <HardDrive className="w-3 h-3 text-gray-600 absolute -bottom-1 -right-1" />
             </div>
           )}
+
+          {/* Status dot overlay - visible in compact mode */}
+          {compact && (
+            <span className={`absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full border-2 border-black ${statusInfo.dotColor}`} />
+          )}
         </button>
 
-        {/* Status Text */}
-        <div className="flex items-center gap-1">
-          <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dotColor}`} />
-          <span className={`text-[10px] ${statusInfo.color}`}>
-            {statusInfo.text}
-          </span>
-        </div>
+        {/* Status Text - only in non-compact mode */}
+        {!compact && (
+          <div className="flex items-center gap-1">
+            <span className={`w-1.5 h-1.5 rounded-full ${statusInfo.dotColor}`} />
+            <span className={`text-[10px] ${statusInfo.color}`}>
+              {statusInfo.text}
+            </span>
+          </div>
+        )}
       </div>
 
       {/* Username Modal */}

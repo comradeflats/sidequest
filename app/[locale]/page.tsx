@@ -601,31 +601,35 @@ export default function Home() {
 
   return (
     <main className="min-h-screen bg-black text-emerald-400 p-6 selection:bg-emerald-900 selection:text-emerald-100">
-      {/* Fixed Header Buttons */}
-      {/* Auth Button - Always visible in top right */}
-      <div className="fixed top-4 right-4 z-40 flex items-center gap-2">
-        {campaign && (
-          <button
-            onClick={() => setShowQuestBook(true)}
-            className="w-14 h-14 bg-black/90 rounded-full border border-adventure-gold/30 shadow-lg hover:border-adventure-gold hover:bg-black transition-colors flex items-center justify-center"
-            aria-label="Open Quest Book"
-          >
-            <BookOpen className="w-6 h-6 text-adventure-gold" />
-          </button>
-        )}
-        <AuthButton />
+      {/* Unified Header Bar */}
+      <div className="fixed top-0 left-0 right-0 z-40 px-4 py-3">
+        <div className="flex items-center justify-between max-w-md mx-auto">
+          {/* Left: XP/Level (only when campaign active) */}
+          <div className="flex-shrink-0">
+            {campaign ? (
+              <XPHeader onXPGain={xpGain} />
+            ) : (
+              <div className="w-14" /> {/* Spacer for balance */}
+            )}
+          </div>
+
+          {/* Right: Quest Book + Auth */}
+          <div className="flex items-center gap-2">
+            {campaign && (
+              <button
+                onClick={() => setShowQuestBook(true)}
+                className="w-10 h-10 bg-black/90 rounded-full border border-adventure-gold/30 shadow-lg hover:border-adventure-gold hover:bg-black transition-colors flex items-center justify-center"
+                aria-label="Open Quest Book"
+              >
+                <BookOpen className="w-5 h-5 text-adventure-gold" />
+              </button>
+            )}
+            <AuthButton compact />
+          </div>
+        </div>
       </div>
 
-      {campaign && (
-        <>
-          {/* XP Header - Fixed Position Left */}
-          <div className="fixed top-4 left-4 z-40">
-            <XPHeader onXPGain={xpGain} />
-          </div>
-        </>
-      )}
-
-      <div className="max-w-md mx-auto pt-20 pb-20">
+      <div className="max-w-md mx-auto pt-16 pb-20">
         <header className="mb-12 text-center">
           <motion.h1
             initial={{ opacity: 0, y: -20 }}
