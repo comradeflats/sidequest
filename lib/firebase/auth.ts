@@ -80,7 +80,7 @@ export const signInAnonymous = async (): Promise<User> => {
   }
 };
 
-// Sign in with Google (uses redirect on mobile, popup on desktop)
+// Sign in with Google (popup-first strategy to avoid cross-origin redirect issues)
 export const signInWithGoogle = async (): Promise<User> => {
   const deviceInfo = getDeviceInfo();
   const networkState = getNetworkState();
@@ -93,40 +93,44 @@ export const signInWithGoogle = async (): Promise<User> => {
   });
 
   try {
-    // Ensure persistence is set to LOCAL (survives browser restarts and redirects)
     await setPersistence(auth, browserLocalPersistence);
   } catch (error) {
     logAuthError('set_persistence', error);
-    // Continue anyway, as it might already be set or not critical for immediate flow
   }
 
-  if (isMobile()) {
-    // Mobile: use redirect (more reliable, no popup issues)
-    authLog('Using redirect flow for mobile');
-    setRedirectPending();
-    authLog('Calling signInWithRedirect...');
-    await signInWithRedirect(auth, googleProvider);
-    // Won't return - page redirects. Result handled by checkRedirectResult
-    return null as any;
-  }
-
-  // Desktop: try popup
-  authLog('Using popup flow for desktop');
+  // Try popup first for ALL devices (avoids cross-origin redirect issues)
+  authLog('Attempting popup sign-in (popup-first strategy)');
   try {
     const result = await signInWithPopup(auth, googleProvider);
     logAuthEvent('popup_sign_in_success', { uid: result.user.uid });
     return result.user;
   } catch (error: unknown) {
-    logAuthError('signInWithGoogle_popup', error);
     const firebaseError = error as { code?: string };
-    if (firebaseError.code === 'auth/popup-blocked' || firebaseError.code === 'auth/popup-closed-by-user') {
+    logAuthError('signInWithGoogle_popup', error);
+
+    // If popup blocked/closed and on mobile, fall back to redirect
+    if (isMobile() && (
+      firebaseError.code === 'auth/popup-blocked' ||
+      firebaseError.code === 'auth/popup-closed-by-user' ||
+      firebaseError.code === 'auth/cancelled-popup-request'
+    )) {
+      authLog('Popup failed on mobile, falling back to redirect');
+      setRedirectPending();
+      await signInWithRedirect(auth, googleProvider);
+      return null as any;
+    }
+
+    // Desktop popup blocked - throw user-friendly error
+    if (firebaseError.code === 'auth/popup-blocked' ||
+        firebaseError.code === 'auth/popup-closed-by-user') {
       throw new PopupBlockedError();
     }
+
     throw error;
   }
 };
 
-// Link anonymous account to Google (upgrade account)
+// Link anonymous account to Google (popup-first strategy to avoid cross-origin redirect issues)
 export const linkAnonymousToGoogle = async (): Promise<User> => {
   const currentUser = auth.currentUser;
   if (!currentUser) {
@@ -140,27 +144,34 @@ export const linkAnonymousToGoogle = async (): Promise<User> => {
 
   logAuthEvent('link_anonymous_started', { uid: currentUser.uid });
 
-  if (isMobile()) {
-    // Mobile: use redirect (more reliable, no popup issues)
-    authLog('Using redirect flow for link');
-    setRedirectPending();
-    await linkWithRedirect(currentUser, googleProvider);
-    // Won't return - page redirects. Result handled by checkRedirectResult
-    return null as any;
-  }
-
-  // Desktop: try popup
-  authLog('Using popup flow for link');
+  // Try popup first for ALL devices (avoids cross-origin redirect issues)
+  authLog('Attempting link popup (popup-first strategy)');
   try {
     const result = await linkWithPopup(currentUser, googleProvider);
     logAuthEvent('link_popup_success', { uid: result.user.uid });
     return result.user;
   } catch (error: unknown) {
-    logAuthError('linkAnonymousToGoogle_popup', error);
     const firebaseError = error as { code?: string };
-    if (firebaseError.code === 'auth/popup-blocked' || firebaseError.code === 'auth/popup-closed-by-user') {
+    logAuthError('linkAnonymousToGoogle_popup', error);
+
+    // If popup blocked/closed and on mobile, fall back to redirect
+    if (isMobile() && (
+      firebaseError.code === 'auth/popup-blocked' ||
+      firebaseError.code === 'auth/popup-closed-by-user' ||
+      firebaseError.code === 'auth/cancelled-popup-request'
+    )) {
+      authLog('Link popup failed on mobile, falling back to redirect');
+      setRedirectPending();
+      await linkWithRedirect(currentUser, googleProvider);
+      return null as any;
+    }
+
+    // Desktop popup blocked - throw user-friendly error
+    if (firebaseError.code === 'auth/popup-blocked' ||
+        firebaseError.code === 'auth/popup-closed-by-user') {
       throw new PopupBlockedError();
     }
+
     throw error;
   }
 };
