@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode, useCallback } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useCallback, useRef } from "react";
 import { User, updateProfile } from "firebase/auth";
 import { onAuthChange, checkRedirectResult, signOut, signInWithGoogle, isRedirectPending, clearRedirectPending } from "./auth";
 import { initAnalytics } from "./config";
@@ -73,6 +73,9 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
     setNeedsProfileSetup(false);
   }, []);
 
+  // Prevent double initialization in Strict Mode
+  const isInitialized = useRef(false);
+
   useEffect(() => {
     // Initialize analytics
     initAnalytics();
@@ -80,6 +83,10 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
     let unsubscribe: (() => void) | undefined;
 
     const initAuth = async () => {
+      // Prevent double execution of auth logic
+      if (isInitialized.current) return;
+      isInitialized.current = true;
+
       // Log redirect return state first (captures URL params that may be lost)
       logRedirectReturn();
 
