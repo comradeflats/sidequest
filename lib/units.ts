@@ -105,3 +105,13 @@ export function formatMeters(meters: number, system: UnitSystem): string {
   }
   return `${meters.toFixed(0)}m`;
 }
+
+/**
+ * Format a distance range (min-max in km) for display
+ * Used by DistanceRangeSelector to show range descriptions
+ */
+export function formatDistanceRange(minKm: number, maxKm: number, system: UnitSystem): string {
+  const minFormatted = formatDistance(minKm, system);
+  const maxFormatted = formatDistance(maxKm, system);
+  return `${minFormatted}-${maxFormatted}`;
+}

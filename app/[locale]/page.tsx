@@ -151,7 +151,7 @@ export default function Home() {
       if (activeCampaignId && !campaign) {
         const stored = await loadCampaign(activeCampaignId);
         if (stored && !stored.completedAt) {
-          // Always show resume prompt - images will be loaded from Firebase or regenerated if missing
+          // Always show resume prompt - images will be loaded from IndexedDB or regenerated if missing
           setSavedCampaignId(activeCampaignId);
           setShowResumePrompt(true);
         }
@@ -525,7 +525,7 @@ export default function Home() {
     if (currentQuest.coordinates && currentQuest.placeName) {
       // Use actual placeId from Places API, or fallback to coordinates-based ID
       const placeId = currentQuest.placeId || `${currentQuest.coordinates.lat.toFixed(6)}_${currentQuest.coordinates.lng.toFixed(6)}`;
-      addVisitedPlace({
+      await addVisitedPlace({
         placeId,
         placeName: currentQuest.placeName,
         campaignId: campaign.id,
@@ -542,12 +542,12 @@ export default function Home() {
       xpAmount += distanceBonus;
     }
 
-    // Streak bonus: update streak and get bonus
-    const consecutiveDays = updateStreak();
+    // Streak bonus: update streak and get bonus (async now for cloud sync)
+    const consecutiveDays = await updateStreak();
     const streakBonus = getStreakBonus(consecutiveDays);
     xpAmount += streakBonus;
 
-    addXP(xpAmount);
+    await addXP(xpAmount);
     setXpGain({ amount: xpAmount, timestamp: Date.now() });
 
     // Track quest completion
@@ -569,7 +569,7 @@ export default function Home() {
     } else {
       // Campaign complete! Mark it and add to history
       await markCampaignComplete(campaign.id);
-      addToHistory(campaign.id);
+      await addToHistory(campaign.id);
 
       // Finalize journey before showing completion
       const finalStats = finalizeJourney();
@@ -781,6 +781,7 @@ export default function Home() {
               <DistanceRangeSelector
                 selectedRange={distanceRange}
                 onSelect={setDistanceRange}
+                unitSystem={unitSystem}
               />
 
               {/* Campaign Type Selection */}

@@ -4,7 +4,6 @@ import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { LayoutGrid, X, BookOpen, Settings } from 'lucide-react';
 import XPHeader from './XPHeader';
-import AuthButton from './AuthButton';
 import SettingsModal from './SettingsModal';
 import { Campaign } from '@/types';
 import { UnitSystem } from '@/lib/units';
@@ -148,21 +147,11 @@ export default function CollapsibleToolbar({
               <Settings className="w-5 h-5 text-gray-400" />
             </motion.button>
 
-            {/* Auth Button */}
-            <motion.div
-              initial={{ opacity: 0, scale: 0.5 }}
-              animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: campaign ? 0.2 : 0.1 }}
-              onClick={resetAutoCollapseTimer}
-            >
-              <AuthButton compact />
-            </motion.div>
-
             {/* Collapse Button */}
             <motion.button
               initial={{ opacity: 0, scale: 0.5 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: campaign ? 0.25 : 0.15 }}
+              transition={{ delay: campaign ? 0.2 : 0.1 }}
               onClick={handleToggle}
               className="w-8 h-8 rounded-full hover:bg-white/10 transition-colors flex items-center justify-center"
               aria-label="Collapse toolbar"

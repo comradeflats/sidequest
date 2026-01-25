@@ -13,6 +13,7 @@ const PLAYER_PROGRESS_KEY = 'player_progress';
 const QUEST_PREFERENCES_KEY = 'quest_preferences';
 const VISITED_PLACES_KEY = 'visited_places';
 const STREAK_DATA_KEY = 'streak_data';
+const USER_PROFILE_KEY = 'user_profile';
 const MAX_HISTORY_SIZE = 10;
 const MAX_VISITED_PLACES = 500;
 
@@ -21,6 +22,32 @@ export interface StreakData {
   lastPlayDate: string; // YYYY-MM-DD format
   consecutiveDays: number;
 }
+
+// User profile data
+export interface UserProfile {
+  username: string;
+  avatarId: string;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// Avatar options with Lucide icons
+export const AVATAR_OPTIONS = [
+  { id: 'compass', icon: 'Compass', label: 'Explorer', color: 'text-adventure-gold' },
+  { id: 'map', icon: 'Map', label: 'Cartographer', color: 'text-adventure-emerald' },
+  { id: 'mountain', icon: 'Mountain', label: 'Climber', color: 'text-adventure-sky' },
+  { id: 'tent', icon: 'Tent', label: 'Camper', color: 'text-green-500' },
+  { id: 'gem', icon: 'Gem', label: 'Treasure Hunter', color: 'text-purple-500' },
+  { id: 'flame', icon: 'Flame', label: 'Trailblazer', color: 'text-orange-500' },
+  { id: 'star', icon: 'Star', label: 'Star Seeker', color: 'text-yellow-400' },
+  { id: 'trophy', icon: 'Trophy', label: 'Champion', color: 'text-amber-500' },
+  { id: 'swords', icon: 'Swords', label: 'Knight', color: 'text-slate-400' },
+  { id: 'crown', icon: 'Crown', label: 'Royalty', color: 'text-yellow-500' },
+  { id: 'ship', icon: 'Ship', label: 'Voyager', color: 'text-blue-400' },
+  { id: 'bird', icon: 'Bird', label: 'Scout', color: 'text-sky-400' },
+] as const;
+
+export type AvatarOption = typeof AVATAR_OPTIONS[number];
 
 // Quest type preferences
 export interface QuestTypePreferences {
@@ -50,24 +77,8 @@ export async function saveCampaign(
     }
   }
 
-  // Save campaign metadata to localStorage (without images to stay under quota)
-  saveToLocalStorage(campaign, progress, journeyStats);
-}
-
-/**
- * Save campaign metadata to localStorage (without images)
- */
-function saveToLocalStorage(
-  campaign: Campaign,
-  progress: {
-    currentQuestIndex: number;
-    completedQuests: string[];
-    verificationResults?: Record<string, VerificationResult>;
-  },
-  journeyStats?: JourneyStats
-): void {
+  // Save metadata to localStorage (without images)
   try {
-    // Always save without images to localStorage (images are in IndexedDB)
     const campaignWithoutImages = {
       ...campaign,
       quests: campaign.quests.map(quest => ({
@@ -99,8 +110,41 @@ function saveToLocalStorage(
  * Load a campaign from storage (metadata from localStorage, images from IndexedDB)
  */
 export async function loadCampaign(campaignId: string): Promise<StoredCampaign | null> {
-  // Load metadata from localStorage
-  const stored = loadFromLocalStorage(campaignId);
+  let stored: StoredCampaign | null = null;
+
+  // Load from localStorage
+  try {
+    const data = localStorage.getItem(`campaign_${campaignId}`);
+    if (!data) {
+      return null;
+    }
+
+    stored = JSON.parse(data);
+
+    // Parse dates
+    if (stored) {
+      stored.lastPlayedAt = new Date(stored.lastPlayedAt);
+      if (stored.completedAt) {
+        stored.completedAt = new Date(stored.completedAt);
+      }
+      if (stored.journeyStats) {
+        stored.journeyStats.startTime = new Date(stored.journeyStats.startTime);
+        if (stored.journeyStats.endTime) {
+          stored.journeyStats.endTime = new Date(stored.journeyStats.endTime);
+        }
+        stored.journeyStats.pathPoints = stored.journeyStats.pathPoints.map(point => ({
+          ...point,
+          timestamp: new Date(point.timestamp)
+        }));
+        stored.journeyStats.questCompletionTimes = stored.journeyStats.questCompletionTimes.map(
+          time => new Date(time)
+        );
+      }
+    }
+  } catch {
+    return null;
+  }
+
   if (!stored) {
     return null;
   }
@@ -117,50 +161,12 @@ export async function loadCampaign(campaignId: string): Promise<StoredCampaign |
           quest.imageUrl = images[quest.id];
         }
       }
-
     } catch {
       // Failed to load images from IndexedDB, they will be regenerated
     }
   }
 
   return stored;
-}
-
-/**
- * Load campaign metadata from localStorage
- */
-function loadFromLocalStorage(campaignId: string): StoredCampaign | null {
-  try {
-    const data = localStorage.getItem(`campaign_${campaignId}`);
-    if (!data) {
-      return null;
-    }
-
-    const stored: StoredCampaign = JSON.parse(data);
-
-    // Parse dates
-    stored.lastPlayedAt = new Date(stored.lastPlayedAt);
-    if (stored.completedAt) {
-      stored.completedAt = new Date(stored.completedAt);
-    }
-    if (stored.journeyStats) {
-      stored.journeyStats.startTime = new Date(stored.journeyStats.startTime);
-      if (stored.journeyStats.endTime) {
-        stored.journeyStats.endTime = new Date(stored.journeyStats.endTime);
-      }
-      stored.journeyStats.pathPoints = stored.journeyStats.pathPoints.map(point => ({
-        ...point,
-        timestamp: new Date(point.timestamp)
-      }));
-      stored.journeyStats.questCompletionTimes = stored.journeyStats.questCompletionTimes.map(
-        time => new Date(time)
-      );
-    }
-
-    return stored;
-  } catch {
-    return null;
-  }
 }
 
 /**
@@ -182,8 +188,9 @@ export async function clearCurrentCampaign(): Promise<void> {
  */
 export async function markCampaignComplete(campaignId: string): Promise<void> {
   try {
-    const stored = loadFromLocalStorage(campaignId);
-    if (stored) {
+    const data = localStorage.getItem(`campaign_${campaignId}`);
+    if (data) {
+      const stored: StoredCampaign = JSON.parse(data);
       stored.completedAt = new Date();
       localStorage.setItem(`campaign_${campaignId}`, JSON.stringify(stored));
     }
@@ -195,7 +202,7 @@ export async function markCampaignComplete(campaignId: string): Promise<void> {
 /**
  * Add a campaign to history
  */
-export function addToHistory(campaignId: string): void {
+export async function addToHistory(campaignId: string): Promise<void> {
   try {
     const historyData = localStorage.getItem(CAMPAIGN_HISTORY_KEY);
     let history: string[] = historyData ? JSON.parse(historyData) : [];
@@ -229,7 +236,7 @@ export async function getCampaignHistory(): Promise<StoredCampaign[]> {
     const campaigns: StoredCampaign[] = [];
 
     for (const campaignId of history) {
-      const campaign = loadFromLocalStorage(campaignId);
+      const campaign = await loadCampaign(campaignId);
       if (campaign) {
         campaigns.push(campaign);
       }
@@ -325,7 +332,7 @@ export function calculateLevel(xp: number): number {
 }
 
 /**
- * Get player progress from storage
+ * Get player progress from localStorage
  */
 export function getPlayerProgress(): PlayerProgress {
   try {
@@ -351,9 +358,8 @@ export function getPlayerProgress(): PlayerProgress {
 /**
  * Add XP to player progress
  */
-export function addXP(amount: number): PlayerProgress {
+export async function addXP(amount: number): Promise<PlayerProgress> {
   const current = getPlayerProgress();
-  const previousLevel = current.level;
 
   current.totalXP += amount;
   current.questsCompleted += 1;
@@ -478,12 +484,12 @@ export function getVisitedPlaces(): VisitedPlace[] {
  * Add a visited place (called on quest completion)
  * Uses LRU eviction when exceeding MAX_VISITED_PLACES
  */
-export function addVisitedPlace(place: {
+export async function addVisitedPlace(place: {
   placeId: string;
   placeName: string;
   campaignId: string;
   coordinates: Coordinates;
-}): void {
+}): Promise<void> {
   try {
     const current = getVisitedPlaces();
 
@@ -515,7 +521,6 @@ export function addVisitedPlace(place: {
       places: updatedPlaces,
       lastUpdated: new Date()
     };
-
     localStorage.setItem(VISITED_PLACES_KEY, JSON.stringify(visitedData));
   } catch {
     // Failed to save visited place
@@ -588,67 +593,6 @@ export async function migrateVisitedPlacesFromHistory(): Promise<number> {
 }
 
 // ============================================
-// Local Data Detection (for cloud sync)
-// ============================================
-
-/**
- * Check if user has any local data that could be synced to cloud
- * Used to determine if we should offer data transfer after sign-in
- */
-export function hasAnyData(): boolean {
-  try {
-    const progress = getPlayerProgress();
-    const historyData = localStorage.getItem(CAMPAIGN_HISTORY_KEY);
-    const currentCampaignId = localStorage.getItem(CURRENT_CAMPAIGN_KEY);
-
-    // Check if player has any XP or completed quests
-    const hasProgress = progress.totalXP > 0 || progress.questsCompleted > 0;
-
-    // Check if there are any saved campaigns
-    const hasHistory = historyData ? JSON.parse(historyData).length > 0 : false;
-
-    // Check if there's an active campaign
-    const hasActiveCampaign = !!currentCampaignId;
-
-    return hasProgress || hasHistory || hasActiveCampaign;
-  } catch {
-    return false;
-  }
-}
-
-/**
- * Get a summary of local data for display in transfer modal
- */
-export function getLocalDataSummary(): {
-  totalXP: number;
-  questsCompleted: number;
-  campaignCount: number;
-  hasActiveCampaign: boolean;
-} {
-  try {
-    const progress = getPlayerProgress();
-    const historyData = localStorage.getItem(CAMPAIGN_HISTORY_KEY);
-    const currentCampaignId = localStorage.getItem(CURRENT_CAMPAIGN_KEY);
-
-    const campaignCount = historyData ? JSON.parse(historyData).length : 0;
-
-    return {
-      totalXP: progress.totalXP,
-      questsCompleted: progress.questsCompleted,
-      campaignCount,
-      hasActiveCampaign: !!currentCampaignId,
-    };
-  } catch {
-    return {
-      totalXP: 0,
-      questsCompleted: 0,
-      campaignCount: 0,
-      hasActiveCampaign: false,
-    };
-  }
-}
-
-// ============================================
 // Streak Tracking
 // ============================================
 
@@ -700,7 +644,7 @@ export function getStreakData(): StreakData {
  * Update streak on quest completion
  * Returns the updated consecutive days count
  */
-export function updateStreak(): number {
+export async function updateStreak(): Promise<number> {
   const today = getTodayString();
   const current = getStreakData();
 
@@ -754,4 +698,63 @@ export function getCurrentStreak(): number {
 
   // Streak has been broken
   return 0;
+}
+
+// ============================================
+// User Profile
+// ============================================
+
+/**
+ * Get user profile from localStorage
+ */
+export function getUserProfile(): UserProfile | null {
+  try {
+    const data = localStorage.getItem(USER_PROFILE_KEY);
+    if (data) {
+      const profile = JSON.parse(data);
+      // Parse dates
+      profile.createdAt = new Date(profile.createdAt);
+      profile.updatedAt = new Date(profile.updatedAt);
+      return profile;
+    }
+  } catch {
+    // Failed to load user profile
+  }
+  return null;
+}
+
+/**
+ * Save user profile to localStorage
+ */
+export function saveUserProfile(profile: UserProfile): void {
+  try {
+    localStorage.setItem(USER_PROFILE_KEY, JSON.stringify(profile));
+  } catch {
+    // Failed to save user profile
+  }
+}
+
+/**
+ * Create or update user profile
+ */
+export function updateUserProfile(updates: Partial<Omit<UserProfile, 'createdAt' | 'updatedAt'>>): UserProfile {
+  const existing = getUserProfile();
+  const now = new Date();
+
+  const profile: UserProfile = {
+    username: updates.username ?? existing?.username ?? 'Adventurer',
+    avatarId: updates.avatarId ?? existing?.avatarId ?? 'compass',
+    createdAt: existing?.createdAt ?? now,
+    updatedAt: now,
+  };
+
+  saveUserProfile(profile);
+  return profile;
+}
+
+/**
+ * Get avatar option by ID
+ */
+export function getAvatarById(avatarId: string): AvatarOption | undefined {
+  return AVATAR_OPTIONS.find(a => a.id === avatarId);
 }

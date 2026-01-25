@@ -1,28 +1,5 @@
-// Firebase config and services
-export { default as app, auth, db, storage, initAnalytics } from "./config";
+// Firebase config and services (minimal - for Analytics only)
+export { default as app, initAnalytics } from "./config";
 
-// Auth helpers
-export {
-  signInAnonymous,
-  signInWithGoogle,
-  linkAnonymousToGoogle,
-  signOut,
-  onAuthChange,
-  getCurrentUser,
-  checkRedirectResult,
-  PopupBlockedError,
-} from "./auth";
-
-// Provider and hook
+// Provider and hook (minimal - auth removed)
 export { FirebaseProvider, useFirebase } from "./FirebaseProvider";
-export type { StorageMode, SyncStatus } from "./FirebaseProvider";
-
-// Firestore helpers
-export {
-  saveUserProfile,
-  getUserProfile,
-  updateDisplayName,
-  hasUserProfile,
-  createInitialProfile,
-} from "./firestore";
-export type { UserProfile } from "./firestore";

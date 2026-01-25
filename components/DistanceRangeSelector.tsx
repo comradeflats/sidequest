@@ -3,10 +3,12 @@
 import { DistanceRange, DISTANCE_RANGES } from '@/types';
 import { Footprints, Navigation, Map, LucideIcon } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { UnitSystem, formatDistanceRange } from '@/lib/units';
 
 interface Props {
   selectedRange: DistanceRange | null;
   onSelect: (range: DistanceRange) => void;
+  unitSystem: UnitSystem;
 }
 
 // Icons for each distance range
@@ -16,7 +18,7 @@ const ICONS: Record<DistanceRange, LucideIcon> = {
   far: Map,           // Map for far distances
 };
 
-export default function DistanceRangeSelector({ selectedRange, onSelect }: Props) {
+export default function DistanceRangeSelector({ selectedRange, onSelect, unitSystem }: Props) {
   return (
     <div className="space-y-3">
       <label className="block text-xs font-pixel text-adventure-gold">
@@ -59,7 +61,7 @@ export default function DistanceRangeSelector({ selectedRange, onSelect }: Props
 
               {/* Distance range */}
               <div className="text-xs text-gray-400 font-sans">
-                {config.description}
+                {formatDistanceRange(config.minDistance, config.maxDistance, unitSystem)}
               </div>
             </motion.button>
           );
