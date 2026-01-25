@@ -6,7 +6,7 @@ import { MapPin, Compass, Zap, CheckCircle, XCircle, Camera, Video, Mic, Navigat
 import { generateCampaign, verifyMedia, verifyMediaWithAppeal } from '@/lib/game-logic';
 import { geocodeLocation } from '@/lib/location';
 import { generateQuestImage } from '@/lib/gemini';
-import { Campaign, VerificationResult, DistanceRange, LocationData, Coordinates, AppealData, MediaCaptureData, XP_REWARDS, QuestType, CampaignOptions, StoredCampaign } from '@/types';
+import { Campaign, VerificationResult, DistanceRange, LocationData, Coordinates, AppealData, MediaCaptureData, XP_REWARDS, XP_DISTANCE_BONUS_PER_KM, getStreakBonus, QuestType, CampaignOptions, StoredCampaign } from '@/types';
 import { trackEvent } from '@/lib/analytics';
 import MediaScanner from '@/components/MediaScanner';
 import DistanceRangeSelector from '@/components/DistanceRangeSelector';
@@ -30,9 +30,12 @@ import {
   getCampaignHistory,
   addXP,
   addVisitedPlace,
-  migrateVisitedPlacesFromHistory
+  migrateVisitedPlacesFromHistory,
+  updateStreak
 } from '@/lib/storage';
 import { useSessionContext } from '@/hooks/useSessionContext';
+import { useUnitPreference } from '@/hooks/useUnitPreference';
+import { formatDistance, formatAccuracy, formatMeters } from '@/lib/units';
 
 export default function Home() {
   const [location, setLocation] = useState('');
@@ -111,6 +114,9 @@ export default function Home() {
     campaignId: campaign?.id || null,
     enabled: !!campaign
   });
+
+  // Initialize unit preference hook
+  const { unitSystem, toggleUnit } = useUnitPreference();
 
   // Update GPS state when geolocation changes
   useEffect(() => {
@@ -527,8 +533,20 @@ export default function Home() {
       });
     }
 
-    // Award XP based on quest difficulty
-    const xpAmount = XP_REWARDS[currentQuest.difficulty] || XP_REWARDS.medium;
+    // Award XP based on quest difficulty + bonuses
+    let xpAmount = XP_REWARDS[currentQuest.difficulty] || XP_REWARDS.medium;
+
+    // Distance bonus: +10 XP per km traveled in this journey
+    if (journeyStats && journeyStats.totalDistanceTraveled > 0) {
+      const distanceBonus = Math.floor(journeyStats.totalDistanceTraveled * XP_DISTANCE_BONUS_PER_KM);
+      xpAmount += distanceBonus;
+    }
+
+    // Streak bonus: update streak and get bonus
+    const consecutiveDays = updateStreak();
+    const streakBonus = getStreakBonus(consecutiveDays);
+    xpAmount += streakBonus;
+
     addXP(xpAmount);
     setXpGain({ amount: xpAmount, timestamp: Date.now() });
 
@@ -606,6 +624,8 @@ export default function Home() {
             campaign={campaign}
             onXPGain={xpGain}
             onOpenQuestBook={() => setShowQuestBook(true)}
+            unitSystem={unitSystem}
+            onToggleUnit={toggleUnit}
           />
         </div>
       </div>
@@ -948,7 +968,7 @@ export default function Home() {
                         <div className="flex items-center gap-4 pl-9 text-xs font-sans">
                           <div className="flex items-center gap-1.5 text-adventure-sky">
                             <Navigation className="w-4 h-4" />
-                            <span>{currentQuest.distanceFromPrevious.toFixed(1)}km away</span>
+                            <span>{formatDistance(currentQuest.distanceFromPrevious, unitSystem)} away</span>
                           </div>
                         </div>
                       )}
@@ -984,16 +1004,20 @@ export default function Home() {
                                   gpsAccuracy && gpsAccuracy <= 100 ? 'text-yellow-500' :
                                   'text-red-500'
                                 }`} />
-                                <div className="text-xs font-sans">
+                                <div className="text-xs font-sans relative group">
                                   {permissionStatus === 'denied' ? (
                                     <span className="text-red-400">GPS: Permission denied</span>
                                   ) : gpsAccuracy ? (
-                                    <span className={
+                                    <span className={`cursor-help ${
                                       gpsAccuracy <= 30 ? 'text-green-400' :
                                       gpsAccuracy <= 100 ? 'text-yellow-400' :
                                       'text-red-400'
-                                    }>
-                                      GPS: ±{gpsAccuracy.toFixed(0)}m
+                                    }`}>
+                                      GPS: {gpsAccuracy <= 30 ? 'Good' : gpsAccuracy <= 100 ? 'Fair' : 'Poor'} ({formatAccuracy(gpsAccuracy, unitSystem)})
+                                      {/* GPS Accuracy Tooltip */}
+                                      <span className="absolute left-0 top-full mt-2 w-64 p-2 bg-zinc-800 border border-zinc-600 rounded-lg text-xs text-gray-300 font-sans opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none shadow-lg">
+                                        Your position is accurate within a {formatMeters(gpsAccuracy, unitSystem)} radius. Lower is better. Move outdoors for improved accuracy.
+                                      </span>
                                     </span>
                                   ) : gpsError ? (
                                     <span className="text-red-400">GPS: {gpsError.length > 20 ? 'Unavailable' : gpsError}</span>
@@ -1049,7 +1073,7 @@ export default function Home() {
                                     const a = Math.sin(dLat / 2) ** 2 + Math.cos((userGps.lat * Math.PI) / 180) * Math.cos((currentQuest.coordinates.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
                                     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
                                     const distanceKm = R * c;
-                                    return distanceKm < 1 ? `${(distanceKm * 1000).toFixed(0)}m` : `${distanceKm.toFixed(2)}km`;
+                                    return formatDistance(distanceKm, unitSystem);
                                   })()}
                                 </span>
                               </div>
@@ -1116,7 +1140,7 @@ export default function Home() {
 
                     {/* Journey Stats Card */}
                     {journeyStats && journeyStats.pathPoints.length > 0 && (
-                      <JourneyStatsCard journeyStats={journeyStats} />
+                      <JourneyStatsCard journeyStats={journeyStats} unitSystem={unitSystem} />
                     )}
 
                     {/* Upcoming Quests Preview */}
@@ -1134,6 +1158,7 @@ export default function Home() {
                               questNumber={campaign.currentQuestIndex + 2 + idx}
                               totalQuests={totalQuests}
                               revealLevel={idx === 0 ? 'next' : 'hidden'}
+                              unitSystem={unitSystem}
                             />
                           ))}
                         </div>
@@ -1143,7 +1168,7 @@ export default function Home() {
                     {/* Campaign Progress */}
                     {campaign.totalDistance && (
                       <div className="text-center text-xs font-sans text-gray-600 space-y-1">
-                        <p>Total Campaign: {campaign.totalDistance.toFixed(1)}km</p>
+                        <p>Total Campaign: {formatDistance(campaign.totalDistance, unitSystem)}</p>
                       </div>
                     )}
                   </>
@@ -1162,6 +1187,7 @@ export default function Home() {
             userGps={userGps}
             gpsAccuracy={gpsAccuracy}
             isSubmitting={isAppealing}
+            unitSystem={unitSystem}
           />
         )}
 
@@ -1171,6 +1197,7 @@ export default function Home() {
             journeyStats={journeyStats}
             quests={campaign.quests}
             campaignStartLocation={campaign.location}
+            unitSystem={unitSystem}
             onClose={() => {
               setShowJourneyMap(false);
 
@@ -1197,6 +1224,7 @@ export default function Home() {
           currentQuestIndex={campaign?.currentQuestIndex || 0}
           campaignHistory={campaignHistory}
           completedQuests={completedQuests}
+          unitSystem={unitSystem}
         />
       </div>
     </main>

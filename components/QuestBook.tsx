@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { X, CheckCircle, Target, Lock, MapPin, Calendar, Trophy, Trash2, AlertTriangle } from 'lucide-react';
 import { Campaign, StoredCampaign } from '@/types';
 import { getVisitedPlacesCount, clearVisitedPlaces } from '@/lib/storage';
+import { UnitSystem, formatDistance, formatDistanceWithUnit } from '@/lib/units';
 
 interface QuestBookProps {
   isOpen: boolean;
@@ -13,6 +14,7 @@ interface QuestBookProps {
   currentQuestIndex: number;
   campaignHistory: StoredCampaign[];
   completedQuests: string[];
+  unitSystem: UnitSystem;
 }
 
 // Standard Galactic Alphabet mapping (Minecraft/Commander Keen style)
@@ -41,7 +43,8 @@ export default function QuestBook({
   currentCampaign,
   currentQuestIndex,
   campaignHistory,
-  completedQuests
+  completedQuests,
+  unitSystem
 }: QuestBookProps) {
   const [activeTab, setActiveTab] = useState<'current' | 'history'>('current');
   const [expandedCampaignId, setExpandedCampaignId] = useState<string | null>(null);
@@ -157,7 +160,7 @@ export default function QuestBook({
                       <div className="flex gap-4 text-xs text-gray-400 font-sans">
                         <span>Progress: {currentQuestIndex + 1}/{currentCampaign.quests.length}</span>
                         <span>•</span>
-                        <span>{totalDistance.toFixed(1)}km traveled</span>
+                        <span>{formatDistance(totalDistance, unitSystem)} traveled</span>
                       </div>
                     </div>
 
@@ -293,10 +296,17 @@ export default function QuestBook({
                         <div className="text-xs text-gray-500 font-sans">Quests</div>
                       </div>
                       <div>
-                        <div className="text-2xl font-bold tabular-nums text-adventure-emerald">
-                          {totalDistanceAllCampaigns.toFixed(1)}
-                        </div>
-                        <div className="text-xs text-gray-500 font-sans">km</div>
+                        {(() => {
+                          const { value, unit } = formatDistanceWithUnit(totalDistanceAllCampaigns, unitSystem);
+                          return (
+                            <>
+                              <div className="text-2xl font-bold tabular-nums text-adventure-emerald">
+                                {value}
+                              </div>
+                              <div className="text-xs text-gray-500 font-sans">{unit}</div>
+                            </>
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -404,7 +414,7 @@ export default function QuestBook({
                                 {stored.journeyStats && (
                                   <>
                                     <span>•</span>
-                                    <span>{stored.journeyStats.totalDistanceTraveled.toFixed(1)}km</span>
+                                    <span>{formatDistance(stored.journeyStats.totalDistanceTraveled, unitSystem)}</span>
                                   </>
                                 )}
                               </div>

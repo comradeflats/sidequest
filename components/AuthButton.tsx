@@ -2,28 +2,21 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { User, LogOut, LogIn, Loader2, Cloud, CloudOff, HardDrive } from 'lucide-react';
+import { User, LogOut, Loader2, Cloud, HardDrive, Wifi, WifiOff, ChevronDown, ChevronUp, Trash2, Copy, Check } from 'lucide-react';
 import { useFirebase, signInAnonymous, signInWithGoogle, linkAnonymousToGoogle, signOut, PopupBlockedError } from '@/lib/firebase';
 import UsernameModal from './UsernameModal';
+import {
+  authLog,
+  getAuthLogs,
+  clearAuthLogs,
+  getDeviceInfo,
+  getNetworkState,
+  checkRedirectTimeout,
+  formatLogsForDisplay,
+} from '@/lib/auth-debug';
 
 // Debug: detect mobile
 const isMobile = typeof window !== 'undefined' && /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-
-// Persistent debug logging that survives redirects
-const logToSession = (msg: string) => {
-  if (typeof window === 'undefined') return;
-  const key = 'auth_debug_log';
-  const existing = sessionStorage.getItem(key) || '';
-  const timestamp = new Date().toISOString().slice(11, 19);
-  sessionStorage.setItem(key, (existing + `${timestamp}: ${msg}\n`).slice(-3000));
-  console.log(`[AuthButton] ${msg}`);
-};
-
-// Get session debug log
-const getSessionLog = (): string => {
-  if (typeof window === 'undefined') return '';
-  return sessionStorage.getItem('auth_debug_log') || '';
-};
 
 interface AuthButtonProps {
   compact?: boolean;
@@ -45,19 +38,49 @@ export default function AuthButton({ compact = false }: AuthButtonProps) {
   const [isSigningIn, setIsSigningIn] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showUsernameModal, setShowUsernameModal] = useState(false);
-  const [debugLog, setDebugLog] = useState<string[]>([]);
+  const [isOnline, setIsOnline] = useState(true);
+  const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [debugLogs, setDebugLogs] = useState<string[]>([]);
+  const [logsCopied, setLogsCopied] = useState(false);
 
   const addDebug = (msg: string) => {
-    logToSession(msg);
-    setDebugLog(prev => [...prev.slice(-4), `${new Date().toLocaleTimeString()}: ${msg}`]);
+    authLog(msg);
+    setDebugLogs(formatLogsForDisplay());
   };
+
+  // Track online/offline status
+  useEffect(() => {
+    const updateOnlineStatus = () => {
+      setIsOnline(navigator.onLine);
+      authLog(`Network status: ${navigator.onLine ? 'online' : 'offline'}`);
+    };
+
+    window.addEventListener('online', updateOnlineStatus);
+    window.addEventListener('offline', updateOnlineStatus);
+    updateOnlineStatus();
+
+    return () => {
+      window.removeEventListener('online', updateOnlineStatus);
+      window.removeEventListener('offline', updateOnlineStatus);
+    };
+  }, []);
 
   // Log auth state changes for debugging
   useEffect(() => {
     if (!loading) {
-      logToSession(`Auth state: ${user ? `User ${user.uid} (anon: ${user.isAnonymous})` : 'No user'}`);
+      authLog(`Auth state: ${user ? `User ${user.uid} (anon: ${user.isAnonymous})` : 'No user'}`);
+      setDebugLogs(formatLogsForDisplay());
     }
   }, [user, loading]);
+
+  // Check for redirect timeout
+  useEffect(() => {
+    const { timedOut, elapsedMs } = checkRedirectTimeout();
+    if (timedOut) {
+      authLog(`Redirect timeout detected: ${elapsedMs}ms`);
+      setError('Sign-in redirect timed out. Please try again.');
+    }
+  }, []);
 
   // Show username modal when profile setup is needed (after anonymous sign-in)
   useEffect(() => {
@@ -416,16 +439,126 @@ export default function AuthButton({ compact = false }: AuthButtonProps) {
         )}
       </AnimatePresence>
 
-      {/* Debug Panel - Remove after fixing */}
-      {debugLog.length > 0 && (
-        <div className="fixed bottom-4 left-4 right-4 bg-black/95 border border-yellow-500 rounded-lg p-3 z-[100] max-h-48 overflow-auto">
-          <div className="text-yellow-500 text-xs font-bold mb-1">Debug Log (mobile: {isMobile ? 'YES' : 'NO'})</div>
-          {debugLog.map((log, i) => (
-            <div key={i} className="text-white text-xs font-mono">{log}</div>
-          ))}
-          {/* Session log persists across redirects */}
-          <div className="text-gray-400 text-xs font-bold mt-2 mb-1 border-t border-yellow-500/30 pt-2">Session Log (persists):</div>
-          <pre className="text-gray-300 text-xs font-mono whitespace-pre-wrap">{getSessionLog()}</pre>
+      {/* Connection Status Indicator (mobile only) */}
+      {isMobile && !isOnline && (
+        <div className="fixed top-16 left-4 right-4 bg-red-900/90 border border-red-500 rounded-lg p-2 z-[100] flex items-center gap-2">
+          <WifiOff className="w-4 h-4 text-red-400" />
+          <span className="text-red-200 text-xs">You are offline. Sign-in requires an internet connection.</span>
+        </div>
+      )}
+
+      {/* Debug Panel Toggle (mobile only) */}
+      {isMobile && debugLogs.length > 0 && (
+        <div className="fixed bottom-4 left-4 right-4 z-[100]">
+          {/* Toggle Button */}
+          <button
+            onClick={() => setShowDebugPanel(!showDebugPanel)}
+            className="w-full bg-zinc-900 border border-yellow-500/50 rounded-t-lg px-3 py-2 flex items-center justify-between"
+          >
+            <div className="flex items-center gap-2">
+              <span className={`w-2 h-2 rounded-full ${isOnline ? 'bg-green-500' : 'bg-red-500'}`} />
+              <span className="text-yellow-500 text-xs font-bold">Auth Debug</span>
+              <span className="text-gray-500 text-xs">({debugLogs.length} entries)</span>
+            </div>
+            {showDebugPanel ? (
+              <ChevronDown className="w-4 h-4 text-gray-400" />
+            ) : (
+              <ChevronUp className="w-4 h-4 text-gray-400" />
+            )}
+          </button>
+
+          {/* Expanded Panel */}
+          <AnimatePresence>
+            {showDebugPanel && (
+              <motion.div
+                initial={{ height: 0, opacity: 0 }}
+                animate={{ height: 'auto', opacity: 1 }}
+                exit={{ height: 0, opacity: 0 }}
+                className="bg-black/95 border border-t-0 border-yellow-500/50 rounded-b-lg overflow-hidden"
+              >
+                <div className="p-3 max-h-64 overflow-auto">
+                  {/* Device Info */}
+                  <div className="text-gray-400 text-xs mb-2">
+                    <span className="text-yellow-500">Device:</span> {isMobile ? 'Mobile' : 'Desktop'} |{' '}
+                    <span className="text-yellow-500">Online:</span> {isOnline ? 'Yes' : 'No'}
+                  </div>
+
+                  {/* Logs */}
+                  <div className="space-y-0.5">
+                    {debugLogs.slice(-30).map((log, i) => {
+                      // Color coding for different log types
+                      let colorClass = 'text-gray-300';
+                      if (log.includes('ERROR') || log.includes('error')) {
+                        colorClass = 'text-red-400';
+                      } else if (log.includes('===') || log.includes('REDIRECT')) {
+                        colorClass = 'text-yellow-400 font-semibold';
+                      } else if (log.includes('success') || log.includes('SUCCESS')) {
+                        colorClass = 'text-green-400';
+                      } else if (log.includes('STACK')) {
+                        colorClass = 'text-orange-400';
+                      }
+                      return (
+                        <div key={i} className={`text-xs font-mono break-all ${colorClass}`}>{log}</div>
+                      );
+                    })}
+                  </div>
+
+                  {/* Action Buttons */}
+                  <div className="mt-3 flex items-center gap-3">
+                    <button
+                      onClick={() => {
+                        clearAuthLogs();
+                        setDebugLogs([]);
+                      }}
+                      className="flex items-center gap-1 text-red-400 text-xs hover:text-red-300"
+                    >
+                      <Trash2 className="w-3 h-3" />
+                      Clear
+                    </button>
+                    <button
+                      onClick={async () => {
+                        const allLogs = getAuthLogs();
+                        const deviceInfo = getDeviceInfo();
+                        const networkState = getNetworkState();
+                        const debugInfo = `=== AUTH DEBUG LOG ===
+Device: ${deviceInfo.isMobile ? 'Mobile' : 'Desktop'}
+Platform: ${deviceInfo.isIOS ? 'iOS' : deviceInfo.isAndroid ? 'Android' : 'Other'}
+Browser: ${deviceInfo.isSafari ? 'Safari' : deviceInfo.isChrome ? 'Chrome' : 'Other'}
+Online: ${networkState.online}
+Screen: ${deviceInfo.screenWidth}x${deviceInfo.screenHeight}
+User Agent: ${deviceInfo.userAgent}
+
+=== LOGS ===
+${allLogs}`;
+                        try {
+                          await navigator.clipboard.writeText(debugInfo);
+                          setLogsCopied(true);
+                          setTimeout(() => setLogsCopied(false), 2000);
+                        } catch {
+                          // Fallback for browsers without clipboard API
+                          console.log(debugInfo);
+                          alert('Logs printed to console (clipboard not available)');
+                        }
+                      }}
+                      className="flex items-center gap-1 text-blue-400 text-xs hover:text-blue-300"
+                    >
+                      {logsCopied ? (
+                        <>
+                          <Check className="w-3 h-3" />
+                          Copied!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3 h-3" />
+                          Copy All
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       )}
     </div>

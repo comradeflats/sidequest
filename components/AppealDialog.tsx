@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { MessageSquare, MapPin, AlertCircle, Send } from 'lucide-react';
 import { Coordinates } from '@/types';
+import { UnitSystem, formatMeters, formatAccuracy } from '@/lib/units';
 
 interface AppealDialogProps {
   onSubmit: (explanation: string) => void;
@@ -12,6 +13,7 @@ interface AppealDialogProps {
   userGps: Coordinates | null;
   gpsAccuracy: number | null; // meters
   isSubmitting?: boolean;
+  unitSystem?: UnitSystem;
 }
 
 export default function AppealDialog({
@@ -20,7 +22,8 @@ export default function AppealDialog({
   distanceFromTarget,
   userGps,
   gpsAccuracy,
-  isSubmitting = false
+  isSubmitting = false,
+  unitSystem = 'metric'
 }: AppealDialogProps) {
   const [explanation, setExplanation] = useState('');
 
@@ -45,7 +48,7 @@ export default function AppealDialog({
       return {
         color: 'text-adventure-emerald',
         icon: MapPin,
-        text: `${distanceFromTarget.toFixed(0)}m from target`,
+        text: `${formatMeters(distanceFromTarget, unitSystem)} from target`,
         helpful: true,
         subtext: 'GPS will help your appeal!'
       };
@@ -53,7 +56,7 @@ export default function AppealDialog({
       return {
         color: 'text-yellow-500',
         icon: MapPin,
-        text: `${distanceFromTarget.toFixed(0)}m from target`,
+        text: `${formatMeters(distanceFromTarget, unitSystem)} from target`,
         helpful: true,
         subtext: 'GPS may help'
       };
@@ -61,7 +64,7 @@ export default function AppealDialog({
       return {
         color: 'text-red-400',
         icon: AlertCircle,
-        text: `${distanceFromTarget.toFixed(0)}m from target`,
+        text: `${formatMeters(distanceFromTarget, unitSystem)} from target`,
         helpful: false,
         subtext: 'Too far for GPS assist'
       };
@@ -115,7 +118,7 @@ export default function AppealDialog({
             )}
             {gpsAccuracy && (
               <p className="text-xs text-gray-600 mt-0.5">
-                Accuracy: ±{gpsAccuracy.toFixed(0)}m
+                Accuracy: {formatAccuracy(gpsAccuracy, unitSystem)}
               </p>
             )}
           </div>

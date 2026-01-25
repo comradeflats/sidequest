@@ -12,8 +12,15 @@ const CAMPAIGN_HISTORY_KEY = 'campaign_history';
 const PLAYER_PROGRESS_KEY = 'player_progress';
 const QUEST_PREFERENCES_KEY = 'quest_preferences';
 const VISITED_PLACES_KEY = 'visited_places';
+const STREAK_DATA_KEY = 'streak_data';
 const MAX_HISTORY_SIZE = 10;
 const MAX_VISITED_PLACES = 500;
+
+// Streak tracking data
+export interface StreakData {
+  lastPlayDate: string; // YYYY-MM-DD format
+  consecutiveDays: number;
+}
 
 // Quest type preferences
 export interface QuestTypePreferences {
@@ -639,4 +646,112 @@ export function getLocalDataSummary(): {
       hasActiveCampaign: false,
     };
   }
+}
+
+// ============================================
+// Streak Tracking
+// ============================================
+
+/**
+ * Get today's date in YYYY-MM-DD format
+ */
+function getTodayString(): string {
+  const today = new Date();
+  return today.toISOString().split('T')[0];
+}
+
+/**
+ * Check if two dates are consecutive days
+ */
+function isConsecutiveDay(previousDate: string, currentDate: string): boolean {
+  const prev = new Date(previousDate);
+  const curr = new Date(currentDate);
+  const diffTime = curr.getTime() - prev.getTime();
+  const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+  return diffDays === 1;
+}
+
+/**
+ * Check if date is the same day
+ */
+function isSameDay(date1: string, date2: string): boolean {
+  return date1 === date2;
+}
+
+/**
+ * Get current streak data
+ */
+export function getStreakData(): StreakData {
+  try {
+    const data = localStorage.getItem(STREAK_DATA_KEY);
+    if (data) {
+      return JSON.parse(data);
+    }
+  } catch {
+    // Failed to load streak data
+  }
+  return {
+    lastPlayDate: '',
+    consecutiveDays: 0,
+  };
+}
+
+/**
+ * Update streak on quest completion
+ * Returns the updated consecutive days count
+ */
+export function updateStreak(): number {
+  const today = getTodayString();
+  const current = getStreakData();
+
+  let newConsecutiveDays = 1;
+
+  if (current.lastPlayDate) {
+    if (isSameDay(current.lastPlayDate, today)) {
+      // Already played today, don't update streak
+      return current.consecutiveDays;
+    } else if (isConsecutiveDay(current.lastPlayDate, today)) {
+      // Consecutive day! Increment streak
+      newConsecutiveDays = current.consecutiveDays + 1;
+    }
+    // Otherwise streak resets to 1
+  }
+
+  const newData: StreakData = {
+    lastPlayDate: today,
+    consecutiveDays: newConsecutiveDays,
+  };
+
+  try {
+    localStorage.setItem(STREAK_DATA_KEY, JSON.stringify(newData));
+  } catch {
+    // Failed to save streak data
+  }
+
+  return newConsecutiveDays;
+}
+
+/**
+ * Get current streak count without updating
+ */
+export function getCurrentStreak(): number {
+  const today = getTodayString();
+  const current = getStreakData();
+
+  if (!current.lastPlayDate) {
+    return 0;
+  }
+
+  // If last play was today, return current streak
+  if (isSameDay(current.lastPlayDate, today)) {
+    return current.consecutiveDays;
+  }
+
+  // If last play was yesterday, streak is still valid
+  if (isConsecutiveDay(current.lastPlayDate, today)) {
+    return current.consecutiveDays;
+  }
+
+  // Streak has been broken
+  return 0;
 }

@@ -11,6 +11,15 @@ import {
   User,
 } from "firebase/auth";
 import { auth } from "./config";
+import {
+  authLog,
+  logAuthEvent,
+  logAuthError,
+  markRedirectStarted,
+  clearRedirectState,
+  getDeviceInfo,
+  getNetworkState,
+} from "../auth-debug";
 
 const googleProvider = new GoogleAuthProvider();
 
@@ -20,6 +29,7 @@ const REDIRECT_PENDING_KEY = 'firebase_auth_redirect_pending';
 export const setRedirectPending = () => {
   if (typeof window !== 'undefined') {
     localStorage.setItem(REDIRECT_PENDING_KEY, 'true');
+    markRedirectStarted();
   }
 };
 
@@ -33,6 +43,7 @@ export const isRedirectPending = (): boolean => {
 export const clearRedirectPending = () => {
   if (typeof window !== 'undefined') {
     localStorage.removeItem(REDIRECT_PENDING_KEY);
+    clearRedirectState();
   }
 };
 
@@ -55,33 +66,49 @@ export class PopupBlockedError extends Error {
 
 // Sign in anonymously (frictionless onboarding)
 export const signInAnonymous = async (): Promise<User> => {
-  const result = await signInAnonymously(auth);
-  return result.user;
+  logAuthEvent('anonymous_sign_in_started');
+  try {
+    const result = await signInAnonymously(auth);
+    logAuthEvent('anonymous_sign_in_success', { uid: result.user.uid });
+    return result.user;
+  } catch (error: any) {
+    logAuthEvent('anonymous_sign_in_error', { code: error.code, message: error.message });
+    throw error;
+  }
 };
 
 // Sign in with Google (uses redirect on mobile, popup on desktop)
 export const signInWithGoogle = async (): Promise<User> => {
-  console.log('[Auth] signInWithGoogle - isMobile:', isMobile());
+  const deviceInfo = getDeviceInfo();
+  const networkState = getNetworkState();
+
+  logAuthEvent('google_sign_in_started', {
+    isMobile: deviceInfo.isMobile,
+    platform: deviceInfo.isIOS ? 'iOS' : deviceInfo.isAndroid ? 'Android' : 'other',
+    browser: deviceInfo.isSafari ? 'Safari' : deviceInfo.isChrome ? 'Chrome' : 'other',
+    online: networkState.online,
+  });
 
   if (isMobile()) {
     // Mobile: use redirect (more reliable, no popup issues)
-    console.log('[Auth] Setting redirect pending flag');
+    authLog('Using redirect flow for mobile');
     setRedirectPending();
-    console.log('[Auth] Calling signInWithRedirect...');
+    authLog('Calling signInWithRedirect...');
     await signInWithRedirect(auth, googleProvider);
     // Won't return - page redirects. Result handled by checkRedirectResult
     return null as any;
   }
 
   // Desktop: try popup
-  console.log('[Auth] Using popup flow for desktop');
+  authLog('Using popup flow for desktop');
   try {
     const result = await signInWithPopup(auth, googleProvider);
-    console.log('[Auth] Popup sign-in successful:', result.user.uid);
+    logAuthEvent('popup_sign_in_success', { uid: result.user.uid });
     return result.user;
-  } catch (error: any) {
-    console.error('[Auth] Popup sign-in error:', error.code, error.message);
-    if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+  } catch (error: unknown) {
+    logAuthError('signInWithGoogle_popup', error);
+    const firebaseError = error as { code?: string };
+    if (firebaseError.code === 'auth/popup-blocked' || firebaseError.code === 'auth/popup-closed-by-user') {
       throw new PopupBlockedError();
     }
     throw error;
@@ -92,14 +119,19 @@ export const signInWithGoogle = async (): Promise<User> => {
 export const linkAnonymousToGoogle = async (): Promise<User> => {
   const currentUser = auth.currentUser;
   if (!currentUser) {
+    logAuthEvent('link_error', { reason: 'no_user' });
     throw new Error("No user signed in");
   }
   if (!currentUser.isAnonymous) {
+    logAuthEvent('link_error', { reason: 'not_anonymous' });
     throw new Error("User is not anonymous");
   }
 
+  logAuthEvent('link_anonymous_started', { uid: currentUser.uid });
+
   if (isMobile()) {
     // Mobile: use redirect (more reliable, no popup issues)
+    authLog('Using redirect flow for link');
     setRedirectPending();
     await linkWithRedirect(currentUser, googleProvider);
     // Won't return - page redirects. Result handled by checkRedirectResult
@@ -107,11 +139,15 @@ export const linkAnonymousToGoogle = async (): Promise<User> => {
   }
 
   // Desktop: try popup
+  authLog('Using popup flow for link');
   try {
     const result = await linkWithPopup(currentUser, googleProvider);
+    logAuthEvent('link_popup_success', { uid: result.user.uid });
     return result.user;
-  } catch (error: any) {
-    if (error.code === 'auth/popup-blocked' || error.code === 'auth/popup-closed-by-user') {
+  } catch (error: unknown) {
+    logAuthError('linkAnonymousToGoogle_popup', error);
+    const firebaseError = error as { code?: string };
+    if (firebaseError.code === 'auth/popup-blocked' || firebaseError.code === 'auth/popup-closed-by-user') {
       throw new PopupBlockedError();
     }
     throw error;
@@ -121,18 +157,24 @@ export const linkAnonymousToGoogle = async (): Promise<User> => {
 // Check for redirect result (call on app initialization for mobile auth)
 export const checkRedirectResult = async (): Promise<User | null> => {
   try {
-    console.log('[Auth] checkRedirectResult - auth.currentUser:', auth.currentUser?.uid);
-    console.log('[Auth] Calling getRedirectResult...');
+    authLog('checkRedirectResult called', {
+      currentUser: auth.currentUser?.uid || 'none',
+      isAnonymous: auth.currentUser?.isAnonymous,
+    });
+
     const result = await getRedirectResult(auth);
-    console.log('[Auth] Result details:', {
+
+    logAuthEvent('redirect_result', {
       hasResult: !!result,
       userId: result?.user?.uid,
       email: result?.user?.email,
-      operationType: result?.operationType
+      operationType: result?.operationType,
+      providerId: result?.providerId,
     });
+
     return result?.user || null;
-  } catch (error: any) {
-    console.error('[Auth] getRedirectResult error:', error.code, error.message, error);
+  } catch (error: unknown) {
+    logAuthError('checkRedirectResult', error);
     // Re-throw all errors so they can be handled by the caller
     throw error;
   }

@@ -2,19 +2,22 @@
 
 import { JourneyStats, Quest } from '@/types';
 import { Map as MapIcon, TrendingUp, Clock, ExternalLink } from 'lucide-react';
+import { UnitSystem, formatDistanceWithUnit } from '@/lib/units';
 
 interface JourneyMapProps {
   journeyStats: JourneyStats;
   quests: Quest[];
   campaignStartLocation?: string; // User's original location input
   onClose: () => void;
+  unitSystem: UnitSystem;
 }
 
 export default function JourneyMap({
   journeyStats,
   quests,
   campaignStartLocation,
-  onClose
+  onClose,
+  unitSystem
 }: JourneyMapProps) {
   // Generate Google Maps URL showing all quest locations
   const generateGoogleMapsUrl = () => {
@@ -97,10 +100,15 @@ export default function JourneyMap({
           <div className="grid grid-cols-3 gap-4">
             <div className="text-center">
               <TrendingUp className="w-5 h-5 text-adventure-emerald mx-auto mb-1" />
-              <p className="text-2xl font-mono tabular-nums text-white">
-                {journeyStats.totalDistanceTraveled.toFixed(2)}
-              </p>
-              <p className="text-xs text-gray-400 font-sans">km traveled</p>
+              {(() => {
+                const { value, unit } = formatDistanceWithUnit(journeyStats.totalDistanceTraveled, unitSystem);
+                return (
+                  <>
+                    <p className="text-2xl font-mono tabular-nums text-white">{value}</p>
+                    <p className="text-xs text-gray-400 font-sans">{unit} traveled</p>
+                  </>
+                );
+              })()}
             </div>
             <div className="text-center">
               <Clock className="w-5 h-5 text-adventure-sky mx-auto mb-1" />

@@ -3,6 +3,8 @@
 import { motion } from 'framer-motion';
 import { Lock, Eye, EyeOff } from 'lucide-react';
 import { Quest } from '@/types';
+import { UnitSystem } from '@/lib/units';
+import { formatDistance } from '@/lib/units';
 
 // Standard Galactic Alphabet mapping (Minecraft/Commander Keen style)
 const GALACTIC_ALPHABET: Record<string, string> = {
@@ -20,13 +22,15 @@ interface QuestPreviewProps {
   questNumber: number;
   totalQuests: number;
   revealLevel: 'next' | 'hidden'; // 'next' = partially visible, 'hidden' = fully obscured
+  unitSystem: UnitSystem;
 }
 
 export default function QuestPreview({
   quest,
   questNumber,
   totalQuests,
-  revealLevel
+  revealLevel,
+  unitSystem
 }: QuestPreviewProps) {
   const isNextQuest = revealLevel === 'next';
 
@@ -109,7 +113,7 @@ export default function QuestPreview({
         {/* Distance hint for next quest */}
         {isNextQuest && quest.distanceFromPrevious && (
           <div className="text-xs font-sans text-zinc-600 flex items-center gap-1">
-            <span>{quest.distanceFromPrevious.toFixed(1)}km from current</span>
+            <span>{formatDistance(quest.distanceFromPrevious, unitSystem)} from current</span>
           </div>
         )}
       </div>

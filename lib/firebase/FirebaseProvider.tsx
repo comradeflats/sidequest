@@ -5,6 +5,7 @@ import { User, updateProfile } from "firebase/auth";
 import { onAuthChange, checkRedirectResult, signOut, signInWithGoogle, isRedirectPending, clearRedirectPending } from "./auth";
 import { initAnalytics } from "./config";
 import { getUserProfile, saveUserProfile, UserProfile } from "./firestore";
+import { authLog, logAuthEvent, logAuthError, logRedirectReturn, isReturningFromRedirect } from "../auth-debug";
 
 export type StorageMode = 'local' | 'cloud';
 export type SyncStatus = 'offline' | 'syncing' | 'synced' | 'error';
@@ -79,29 +80,39 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
     let unsubscribe: (() => void) | undefined;
 
     const initAuth = async () => {
+      // Log redirect return state first (captures URL params that may be lost)
+      logRedirectReturn();
+
       // Log initial state for debugging
-      console.log('[FirebaseProvider] initAuth - isRedirectPending:', isRedirectPending());
-      console.log('[FirebaseProvider] localStorage redirect flag:', typeof window !== 'undefined' ? localStorage.getItem('firebase_auth_redirect_pending') : 'N/A');
-      console.log('[FirebaseProvider] Current URL:', typeof window !== 'undefined' ? window.location.href : 'N/A');
+      logAuthEvent('init_auth_started', {
+        isRedirectPending: isRedirectPending(),
+        isReturningFromRedirect: isReturningFromRedirect(),
+        url: typeof window !== 'undefined' ? window.location.href : 'N/A',
+      });
 
       // Check for pending redirect FIRST (mobile Google sign-in return)
       // This MUST complete before setting up the auth listener to avoid race condition
       if (isRedirectPending()) {
-        console.log('[FirebaseProvider] Redirect pending, checking result...');
+        authLog('Redirect pending, checking result...');
         try {
           const redirectUser = await checkRedirectResult();
-          console.log('[FirebaseProvider] Redirect result:', redirectUser ? `User ${redirectUser.uid} (anon: ${redirectUser.isAnonymous})` : 'No user');
-        } catch (error: any) {
-          console.error('[FirebaseProvider] Redirect error:', error.code, error.message);
+          logAuthEvent('redirect_check_complete', {
+            success: !!redirectUser,
+            uid: redirectUser?.uid,
+            isAnonymous: redirectUser?.isAnonymous,
+          });
+        } catch (error: unknown) {
+          logAuthError('redirect_check', error);
+          const firebaseError = error as { code?: string };
           // Handle credential-already-in-use from redirect (Google account already linked)
-          if (error.code === 'auth/credential-already-in-use') {
-            console.log('[FirebaseProvider] Credential in use, signing out and retrying...');
+          if (firebaseError.code === 'auth/credential-already-in-use') {
+            authLog('Credential in use, signing out and retrying...');
             try {
               await signOut();
               await signInWithGoogle();
               return; // Will redirect again, don't set up listener yet
-            } catch (e: any) {
-              console.error('[FirebaseProvider] Failed to sign in after credential conflict:', e.code, e.message);
+            } catch (e: unknown) {
+              logAuthError('retry_sign_in', e);
             }
           }
         } finally {
@@ -110,23 +121,34 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
       } else {
         // IMPORTANT FIX: Also check getRedirectResult even when flag is not set
         // The localStorage flag may be lost if the page reloads differently
-        console.log('[FirebaseProvider] No redirect flag - checking anyway...');
+        authLog('No redirect flag - checking anyway...');
         try {
           const unexpectedResult = await checkRedirectResult();
           if (unexpectedResult) {
-            console.log('[FirebaseProvider] FOUND redirect result without flag!', unexpectedResult.uid);
+            logAuthEvent('unexpected_redirect_result', { uid: unexpectedResult.uid });
           } else {
-            console.log('[FirebaseProvider] No redirect result found (expected)');
+            authLog('No redirect result found (expected)');
           }
-        } catch (e: any) {
-          // Expected - no redirect result or error
-          console.log('[FirebaseProvider] checkRedirectResult without flag - error:', e.code || e.message);
+        } catch (e: unknown) {
+          // Log warning for unexpected errors (helps diagnose issues)
+          const firebaseError = e as { code?: string; message?: string };
+          authLog(`checkRedirectResult without flag - error: ${firebaseError.code || firebaseError.message || 'unknown'}`);
         }
       }
 
       // NOW set up auth state listener (redirect is already handled)
+      authLog('Setting up auth state listener...');
       unsubscribe = onAuthChange(async (authUser) => {
-        console.log('[FirebaseProvider] Auth state changed:', authUser ? `User ${authUser.uid} (anon: ${authUser.isAnonymous})` : 'No user');
+        logAuthEvent('auth_state_changed', {
+          hasUser: !!authUser,
+          uid: authUser?.uid,
+          isAnonymous: authUser?.isAnonymous,
+          email: authUser?.email,
+          emailVerified: authUser?.emailVerified,
+          providerId: authUser?.providerId,
+          creationTime: authUser?.metadata?.creationTime,
+          lastSignInTime: authUser?.metadata?.lastSignInTime,
+        });
         setUser(authUser);
 
         if (authUser) {

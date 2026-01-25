@@ -239,6 +239,26 @@ export const XP_REWARDS: Record<Difficulty, number> = {
   hard: 150
 };
 
+// XP bonus for distance traveled (per km)
+export const XP_DISTANCE_BONUS_PER_KM = 10;
+
+// Streak bonus thresholds
+export const STREAK_BONUSES = {
+  2: 10,   // 2 consecutive days: +10 XP
+  3: 20,   // 3-6 consecutive days: +20 XP
+  7: 50,   // 7+ consecutive days: +50 XP
+};
+
+/**
+ * Get streak bonus based on consecutive days
+ */
+export function getStreakBonus(consecutiveDays: number): number {
+  if (consecutiveDays >= 7) return STREAK_BONUSES[7];
+  if (consecutiveDays >= 3) return STREAK_BONUSES[3];
+  if (consecutiveDays >= 2) return STREAK_BONUSES[2];
+  return 0;
+}
+
 // Level thresholds (XP needed for each level)
 export const LEVEL_THRESHOLDS = [
   0,      // Level 1

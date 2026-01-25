@@ -1,14 +1,17 @@
 'use client';
 
 import { JourneyStats } from '@/types';
-import { TrendingUp, Clock, MapPin } from 'lucide-react';
+import { formatDistance } from '@/lib/units';
+import { TrendingUp, Clock } from 'lucide-react';
 
 interface JourneyStatsCardProps {
   journeyStats: JourneyStats | null;
+  unitSystem?: 'metric' | 'imperial';
 }
 
 export default function JourneyStatsCard({
-  journeyStats
+  journeyStats,
+  unitSystem = 'metric'
 }: JourneyStatsCardProps) {
   if (!journeyStats) return null;
 
@@ -20,13 +23,13 @@ export default function JourneyStatsCard({
         </h3>
       </div>
 
-      <div className="grid grid-cols-3 gap-3">
+      <div className="grid grid-cols-2 gap-4">
         <div className="text-center">
           <TrendingUp className="w-4 h-4 text-adventure-emerald mx-auto mb-1" />
           <p className="text-xl font-bold tabular-nums text-white">
-            {journeyStats.totalDistanceTraveled.toFixed(2)}
+            {formatDistance(journeyStats.totalDistanceTraveled, unitSystem)}
           </p>
-          <p className="text-xs font-medium uppercase text-gray-500">km</p>
+          <p className="text-xs font-medium uppercase text-gray-500">distance</p>
         </div>
         <div className="text-center">
           <Clock className="w-4 h-4 text-adventure-sky mx-auto mb-1" />
@@ -34,13 +37,6 @@ export default function JourneyStatsCard({
             {journeyStats.durationMinutes}
           </p>
           <p className="text-xs font-medium uppercase text-gray-500">min</p>
-        </div>
-        <div className="text-center">
-          <MapPin className="w-4 h-4 text-adventure-gold mx-auto mb-1" />
-          <p className="text-xl font-bold tabular-nums text-white">
-            {journeyStats.pathPoints.length}
-          </p>
-          <p className="text-xs font-medium uppercase text-gray-500">pts</p>
         </div>
       </div>
     </div>
