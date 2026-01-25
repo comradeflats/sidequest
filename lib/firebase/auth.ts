@@ -8,6 +8,8 @@ import {
   signOut as firebaseSignOut,
   onAuthStateChanged,
   getRedirectResult,
+  setPersistence,
+  browserLocalPersistence,
   User,
 } from "firebase/auth";
 import { auth } from "./config";
@@ -68,6 +70,7 @@ export class PopupBlockedError extends Error {
 export const signInAnonymous = async (): Promise<User> => {
   logAuthEvent('anonymous_sign_in_started');
   try {
+    await setPersistence(auth, browserLocalPersistence);
     const result = await signInAnonymously(auth);
     logAuthEvent('anonymous_sign_in_success', { uid: result.user.uid });
     return result.user;
@@ -88,6 +91,14 @@ export const signInWithGoogle = async (): Promise<User> => {
     browser: deviceInfo.isSafari ? 'Safari' : deviceInfo.isChrome ? 'Chrome' : 'other',
     online: networkState.online,
   });
+
+  try {
+    // Ensure persistence is set to LOCAL (survives browser restarts and redirects)
+    await setPersistence(auth, browserLocalPersistence);
+  } catch (error) {
+    logAuthError('set_persistence', error);
+    // Continue anyway, as it might already be set or not critical for immediate flow
+  }
 
   if (isMobile()) {
     // Mobile: use redirect (more reliable, no popup issues)

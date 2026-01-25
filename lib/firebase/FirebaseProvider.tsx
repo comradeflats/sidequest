@@ -97,53 +97,8 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
         url: typeof window !== 'undefined' ? window.location.href : 'N/A',
       });
 
-      // Check for pending redirect FIRST (mobile Google sign-in return)
-      // This MUST complete before setting up the auth listener to avoid race condition
-      if (isRedirectPending()) {
-        authLog('Redirect pending, checking result...');
-        try {
-          const redirectUser = await checkRedirectResult();
-          logAuthEvent('redirect_check_complete', {
-            success: !!redirectUser,
-            uid: redirectUser?.uid,
-            isAnonymous: redirectUser?.isAnonymous,
-          });
-        } catch (error: unknown) {
-          logAuthError('redirect_check', error);
-          const firebaseError = error as { code?: string };
-          // Handle credential-already-in-use from redirect (Google account already linked)
-          if (firebaseError.code === 'auth/credential-already-in-use') {
-            authLog('Credential in use, signing out and retrying...');
-            try {
-              await signOut();
-              await signInWithGoogle();
-              return; // Will redirect again, don't set up listener yet
-            } catch (e: unknown) {
-              logAuthError('retry_sign_in', e);
-            }
-          }
-        } finally {
-          clearRedirectPending();
-        }
-      } else {
-        // IMPORTANT FIX: Also check getRedirectResult even when flag is not set
-        // The localStorage flag may be lost if the page reloads differently
-        authLog('No redirect flag - checking anyway...');
-        try {
-          const unexpectedResult = await checkRedirectResult();
-          if (unexpectedResult) {
-            logAuthEvent('unexpected_redirect_result', { uid: unexpectedResult.uid });
-          } else {
-            authLog('No redirect result found (expected)');
-          }
-        } catch (e: unknown) {
-          // Log warning for unexpected errors (helps diagnose issues)
-          const firebaseError = e as { code?: string; message?: string };
-          authLog(`checkRedirectResult without flag - error: ${firebaseError.code || firebaseError.message || 'unknown'}`);
-        }
-      }
-
-      // NOW set up auth state listener (redirect is already handled)
+      // SETUP LISTENER FIRST - This is the source of truth
+      // We don't wait for redirect result to block the listener, as that can cause "no user" states
       authLog('Setting up auth state listener...');
       unsubscribe = onAuthChange(async (authUser) => {
         logAuthEvent('auth_state_changed', {
@@ -195,6 +150,50 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
 
         setLoading(false);
       });
+
+      // HANDLE REDIRECT RESULT IN PARALLEL
+      // This catches errors and handles specific redirect cases, but the listener above handles the user state
+      if (isRedirectPending()) {
+        authLog('Redirect pending, checking result...');
+        checkRedirectResult()
+          .then((redirectUser) => {
+            logAuthEvent('redirect_check_complete', {
+              success: !!redirectUser,
+              uid: redirectUser?.uid,
+              isAnonymous: redirectUser?.isAnonymous,
+            });
+          })
+          .catch(async (error: unknown) => {
+            logAuthError('redirect_check', error);
+            const firebaseError = error as { code?: string };
+            // Handle credential-already-in-use from redirect (Google account already linked)
+            if (firebaseError.code === 'auth/credential-already-in-use') {
+              authLog('Credential in use, signing out and retrying...');
+              try {
+                await signOut();
+                await signInWithGoogle();
+              } catch (e: unknown) {
+                logAuthError('retry_sign_in', e);
+              }
+            }
+          })
+          .finally(() => {
+            clearRedirectPending();
+          });
+      } else {
+        // Also check getRedirectResult even when flag is not set (robustness)
+        checkRedirectResult()
+          .then((unexpectedResult) => {
+            if (unexpectedResult) {
+              logAuthEvent('unexpected_redirect_result', { uid: unexpectedResult.uid });
+            }
+          })
+          .catch((e: unknown) => {
+            // Log warning only
+             const firebaseError = e as { code?: string; message?: string };
+             authLog(`checkRedirectResult without flag - error: ${firebaseError.code || firebaseError.message || 'unknown'}`);
+          });
+      }
     };
 
     initAuth();
