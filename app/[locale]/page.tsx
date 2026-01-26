@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Compass, Zap, CheckCircle, XCircle, Camera, Video, Mic, Navigation, MessageSquare, ExternalLink, RefreshCw, Crosshair } from 'lucide-react';
+import { MapPin, Compass, Zap, CheckCircle, XCircle, Camera, Video, Mic, Navigation, MessageSquare, ExternalLink, RefreshCw } from 'lucide-react';
 import { generateCampaign, verifyMedia, verifyMediaWithAppeal } from '@/lib/game-logic';
 import { geocodeLocation } from '@/lib/location';
 import { generateQuestImage } from '@/lib/gemini';
@@ -35,7 +35,7 @@ import {
 } from '@/lib/storage';
 import { useSessionContext } from '@/hooks/useSessionContext';
 import { useUnitPreference } from '@/hooks/useUnitPreference';
-import { formatDistance, formatAccuracy, formatMeters } from '@/lib/units';
+import { formatDistance } from '@/lib/units';
 
 export default function Home() {
   const [location, setLocation] = useState('');
@@ -964,8 +964,8 @@ export default function Home() {
                         {currentQuest.narrative}
                       </p>
 
-                      {/* Distance Info */}
-                      {currentQuest.distanceFromPrevious && (
+                      {/* Distance Info - only show static distance when GPS is disabled */}
+                      {currentQuest.distanceFromPrevious && !gpsEnabled && (
                         <div className="flex items-center gap-4 pl-9 text-xs font-sans">
                           <div className="flex items-center gap-1.5 text-adventure-sky">
                             <Navigation className="w-4 h-4" />
@@ -994,39 +994,42 @@ export default function Home() {
 
                       {/* Action Buttons */}
                       <div className="space-y-3 mt-6">
-                        {/* GPS Status Display */}
+                        {/* GPS Distance Display */}
                         {gpsEnabled && (
                           <div className="bg-zinc-900/50 rounded-lg px-4 py-3 space-y-2">
                             <div className="flex items-center justify-between">
-                              <div className="flex items-center gap-2">
-                                <Crosshair className={`w-4 h-4 ${
-                                  permissionStatus === 'denied' ? 'text-red-500' :
-                                  gpsAccuracy && gpsAccuracy <= 30 ? 'text-green-500' :
-                                  gpsAccuracy && gpsAccuracy <= 100 ? 'text-yellow-500' :
-                                  'text-red-500'
-                                }`} />
-                                <div className="text-xs font-sans relative group">
-                                  {permissionStatus === 'denied' ? (
-                                    <span className="text-red-400">GPS: Permission denied</span>
-                                  ) : gpsAccuracy ? (
-                                    <span className={`cursor-help ${
-                                      gpsAccuracy <= 30 ? 'text-green-400' :
-                                      gpsAccuracy <= 100 ? 'text-yellow-400' :
-                                      'text-red-400'
-                                    }`}>
-                                      GPS: {gpsAccuracy <= 30 ? 'Good' : gpsAccuracy <= 100 ? 'Fair' : 'Poor'} ({formatAccuracy(gpsAccuracy, unitSystem)})
-                                      {/* GPS Accuracy Tooltip */}
-                                      <span className="absolute left-0 top-full mt-2 w-64 p-2 bg-zinc-800 border border-zinc-600 rounded-lg text-xs text-gray-300 font-sans opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all duration-200 z-50 pointer-events-none shadow-lg">
-                                        Your position is accurate within a {formatMeters(gpsAccuracy, unitSystem)} radius. Lower is better. Move outdoors for improved accuracy.
-                                      </span>
-                                    </span>
-                                  ) : gpsError ? (
-                                    <span className="text-red-400">GPS: {gpsError.length > 20 ? 'Unavailable' : gpsError}</span>
-                                  ) : (
-                                    <span className="text-gray-500">GPS: waiting...</span>
-                                  )}
+                              {/* Distance to target */}
+                              {permissionStatus === 'denied' ? (
+                                <div className="flex items-center gap-2 text-xs font-sans text-red-400">
+                                  <Navigation className="w-4 h-4" />
+                                  <span>GPS: Permission denied</span>
                                 </div>
-                              </div>
+                              ) : userGps && currentQuest.coordinates ? (
+                                <div className="flex items-center gap-2 text-xs font-sans text-gray-300">
+                                  <Navigation className="w-4 h-4 text-adventure-sky" />
+                                  <span>
+                                    Distance: {(() => {
+                                      const R = 6371;
+                                      const dLat = ((currentQuest.coordinates.lat - userGps.lat) * Math.PI) / 180;
+                                      const dLng = ((currentQuest.coordinates.lng - userGps.lng) * Math.PI) / 180;
+                                      const a = Math.sin(dLat / 2) ** 2 + Math.cos((userGps.lat * Math.PI) / 180) * Math.cos((currentQuest.coordinates.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
+                                      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                                      const distanceKm = R * c;
+                                      return formatDistance(distanceKm, unitSystem);
+                                    })()}
+                                  </span>
+                                </div>
+                              ) : gpsError ? (
+                                <div className="flex items-center gap-2 text-xs font-sans text-red-400">
+                                  <Navigation className="w-4 h-4" />
+                                  <span>GPS: {gpsError.length > 20 ? 'Unavailable' : gpsError}</span>
+                                </div>
+                              ) : (
+                                <div className="flex items-center gap-2 text-xs font-sans text-gray-500">
+                                  <Navigation className="w-4 h-4" />
+                                  <span>Distance: waiting...</span>
+                                </div>
+                              )}
                               <button
                                 onClick={async () => {
                                   setGpsRefreshFailed(false);
@@ -1060,23 +1063,6 @@ export default function Home() {
                             {permissionStatus === 'denied' && (
                               <div className="text-xs text-red-400 font-sans bg-red-500/10 rounded px-2 py-1">
                                 GPS access denied. Enable location in your browser settings.
-                              </div>
-                            )}
-                            {/* Live distance to target */}
-                            {userGps && currentQuest.coordinates && (
-                              <div className="text-xs text-gray-400 font-sans flex items-center gap-1.5 mt-1">
-                                <Navigation className="w-3 h-3" />
-                                <span>
-                                  Distance to target: {(() => {
-                                    const R = 6371;
-                                    const dLat = ((currentQuest.coordinates.lat - userGps.lat) * Math.PI) / 180;
-                                    const dLng = ((currentQuest.coordinates.lng - userGps.lng) * Math.PI) / 180;
-                                    const a = Math.sin(dLat / 2) ** 2 + Math.cos((userGps.lat * Math.PI) / 180) * Math.cos((currentQuest.coordinates.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-                                    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                                    const distanceKm = R * c;
-                                    return formatDistance(distanceKm, unitSystem);
-                                  })()}
-                                </span>
                               </div>
                             )}
                           </div>
