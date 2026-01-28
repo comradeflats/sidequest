@@ -70,6 +70,9 @@ export default function Home() {
   const [savedCampaignId, setSavedCampaignId] = useState<string | null>(null);
   const [isResuming, setIsResuming] = useState(false);
 
+  // Image Generation Progress State
+  const [imageProgress, setImageProgress] = useState<{current: number, total: number} | null>(null);
+
   // Quest Book State
   const [showQuestBook, setShowQuestBook] = useState(false);
   const [campaignHistory, setCampaignHistory] = useState<StoredCampaign[]>([]);
@@ -236,25 +239,20 @@ export default function Home() {
       // Show loading only if we need to regenerate images
       setIsLoading(true);
       setIsResuming(true);
+      setImageProgress(null);
 
       try {
-        // Regenerate images in parallel for faster loading
-        const imagePromises = questsNeedingImages.map(async (quest) => {
+        // Sequential regeneration with progress tracking
+        for (let i = 0; i < questsNeedingImages.length; i++) {
+          const quest = questsNeedingImages[i];
+          setImageProgress({ current: i + 1, total: questsNeedingImages.length });
+
           try {
-            const imageUrl = await generateQuestImage(quest);
-            return { questId: quest.id, imageUrl: imageUrl || undefined };
+            const imageUrl = await generateQuestImage(quest, 30000);
+            quest.imageUrl = imageUrl || undefined;
           } catch {
-            return { questId: quest.id, imageUrl: undefined };
-          }
-        });
-
-        const results = await Promise.all(imagePromises);
-
-        // Apply the regenerated images to quests
-        for (const result of results) {
-          const quest = stored.campaign.quests.find(q => q.id === result.questId);
-          if (quest) {
-            quest.imageUrl = result.imageUrl;
+            // Continue even if image fails
+            quest.imageUrl = undefined;
           }
         }
       } catch {
@@ -262,6 +260,7 @@ export default function Home() {
       } finally {
         setIsLoading(false);
         setIsResuming(false);
+        setImageProgress(null);
       }
     }
 
@@ -320,6 +319,7 @@ export default function Home() {
     await clearCurrentCampaign();
     setCompletedQuests([]);
     resetSessionContext();
+    setImageProgress(null);
 
     setIsLoading(true);
     try {
@@ -327,7 +327,10 @@ export default function Home() {
       const campaignOptions: CampaignOptions = {
         enableVideoQuests: true,
         enableAudioQuests: true,
-        guaranteedMix: true
+        guaranteedMix: true,
+        onProgress: (current, total) => {
+          setImageProgress({ current, total });
+        }
       };
 
       // Use geocodedLocation.name to pass to generateCampaign (which will geocode again)
@@ -356,6 +359,7 @@ export default function Home() {
       }
     } finally {
       setIsLoading(false);
+      setImageProgress(null);
     }
   };
 
@@ -823,6 +827,11 @@ export default function Home() {
                     message={isResuming ? "RESTORING YOUR ADVENTURE..." : "GENERATING YOUR ADVENTURE..."}
                     subMessage={isResuming ? "Loading your saved progress" : "Creating quests with Gemini 3"}
                     rotatingMessages={isResuming ? RESUME_MESSAGES : GENERATE_MESSAGES}
+                    progressText={
+                      imageProgress
+                        ? `Generating quest images... (${imageProgress.current}/${imageProgress.total})`
+                        : undefined
+                    }
                   />
                 </div>
               )}

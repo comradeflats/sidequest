@@ -264,17 +264,24 @@ export async function generateCampaign(
       };
     });
 
-    // STEP 6: Generate images for all quests in parallel
-    const questsWithImages = await Promise.all(
-      questsWithMetadata.map(async (quest: Quest) => {
-        const imageUrl = await generateQuestImage(quest);
-        return {
-          ...quest,
-          imageUrl,
-          imageGenerationFailed: !imageUrl,
-        };
-      })
-    );
+    // STEP 6: Generate images in parallel with progress tracking
+    let completedCount = 0;
+    const imagePromises = questsWithMetadata.map(async (quest: Quest) => {
+      const imageUrl = await generateQuestImage(quest, 30000); // 30s timeout
+      
+      completedCount++;
+      if (options?.onProgress) {
+        options.onProgress(completedCount, questsWithMetadata.length);
+      }
+
+      return {
+        ...quest,
+        imageUrl,
+        imageGenerationFailed: !imageUrl,
+      };
+    });
+
+    const questsWithImages = await Promise.all(imagePromises);
 
     return {
       ...campaignData,

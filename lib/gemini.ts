@@ -44,58 +44,85 @@ export const getModel = (type: 'campaign' | 'verification' | 'image' = 'verifica
   });
 };
 
-export async function generateQuestImage(quest: Quest): Promise<string | null> {
-  try {
-    const model = getModel('image');
+export async function generateQuestImage(
+  quest: Quest,
+  timeout: number = 30000,
+  retries: number = 1
+): Promise<string | null> {
+  let lastError: Error | null = null;
 
-    const prompt = `
-      Create a 16-bit pixel art scene for this location-based quest.
+  // Try with retry logic
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const model = getModel('image');
 
-      Quest Context: ${quest.narrative}
-      Location Type: ${quest.locationHint}
+      const prompt = `
+        Create a 16-bit pixel art scene for this location-based quest.
 
-      CRITICAL REQUIREMENTS:
-      - NO TEXT OR WORDS anywhere in the image
-      - Purely visual atmospheric scene depicting the location
-      - 16-bit SNES/Genesis era pixel art style
-      - Vibrant retro game colors
-      - Landscape orientation (16:9 ratio)
-      - Atmospheric and evocative
-      - Should feel like a scene from a classic adventure game
+        Quest Context: ${quest.narrative}
+        Location Type: ${quest.locationHint}
 
-      Color Palette Guidelines:
-      - Use emerald green (#10b981) for natural elements (foliage, grass)
-      - Use warm golds (#fbbf24) and ambers for highlights and sunlight
-      - Rich, saturated colors typical of 16-bit era games
-      - Deep shadows for dramatic contrast
+        CRITICAL REQUIREMENTS:
+        - NO TEXT OR WORDS anywhere in the image
+        - Purely visual atmospheric scene depicting the location
+        - 16-bit SNES/Genesis era pixel art style
+        - Vibrant retro game colors
+        - Landscape orientation (16:9 ratio)
+        - Atmospheric and evocative
+        - Should feel like a scene from a classic adventure game
 
-      Composition:
-      - Clear focal point representing the quest location or objective
-      - Depth through parallax-style layering (foreground, midground, background)
-      - Frame-worthy composition suitable for a hero image
-      - Evocative atmosphere that hints at the adventure
+        Color Palette Guidelines:
+        - Use emerald green (#10b981) for natural elements (foliage, grass)
+        - Use warm golds (#fbbf24) and ambers for highlights and sunlight
+        - Rich, saturated colors typical of 16-bit era games
+        - Deep shadows for dramatic contrast
 
-      The image must be entirely visual - NO letters, numbers, signs, or text of any kind.
-      Focus on creating a beautiful, atmospheric pixel art scene.
-    `;
+        Composition:
+        - Clear focal point representing the quest location or objective
+        - Depth through parallax-style layering (foreground, midground, background)
+        - Frame-worthy composition suitable for a hero image
+        - Evocative atmosphere that hints at the adventure
 
-    // Track Image Generation Cost
-    costEstimator.trackGeminiImageGen();
+        The image must be entirely visual - NO letters, numbers, signs, or text of any kind.
+        Focus on creating a beautiful, atmospheric pixel art scene.
+      `;
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
+      // Track Image Generation Cost
+      costEstimator.trackGeminiImageGen();
 
-    // Extract image data from response
-    const imagePart = response.candidates?.[0]?.content?.parts?.[0];
+      // Use Promise.race to enforce timeout
+      const result = await Promise.race([
+        model.generateContent(prompt),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout')), timeout)
+        )
+      ]);
 
-    if (imagePart?.inlineData) {
-      const mimeType = imagePart.inlineData.mimeType || 'image/png';
-      const base64Data = imagePart.inlineData.data;
-      return `data:${mimeType};base64,${base64Data}`;
+      const response = await result.response;
+
+      // Extract image data from response
+      const imagePart = response.candidates?.[0]?.content?.parts?.[0];
+
+      if (imagePart?.inlineData) {
+        const mimeType = imagePart.inlineData.mimeType || 'image/png';
+        const base64Data = imagePart.inlineData.data;
+        return `data:${mimeType};base64,${base64Data}`;
+      }
+
+      return null;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error');
+
+      // If it's not a timeout or this is the last attempt, give up
+      if (!lastError.message.includes('Timeout') || attempt === retries) {
+        break;
+      }
+
+      // Wait before retry (exponential backoff)
+      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
     }
-
-    return null;
-  } catch {
-    return null;
   }
+
+  // All attempts failed
+  return null;
 }

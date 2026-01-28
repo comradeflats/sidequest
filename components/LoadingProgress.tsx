@@ -25,6 +25,7 @@ interface LoadingProgressProps {
   progress?: number; // 0-100, undefined = indeterminate
   subMessage?: string;
   rotatingMessages?: string[]; // Optional array of messages to rotate through
+  progressText?: string; // Optional progress text like "Generating images... (2/3)"
 }
 
 const LOGO_ICONS = [MapPin, Compass, Zap, Map, Sparkles];
@@ -33,7 +34,8 @@ export default function LoadingProgress({
   message,
   progress,
   subMessage,
-  rotatingMessages
+  rotatingMessages,
+  progressText
 }: LoadingProgressProps) {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [iconIndex, setIconIndex] = useState(0);
@@ -121,12 +123,16 @@ export default function LoadingProgress({
         )}
       </div>
 
-      {/* Sub message */}
-      {subMessage && (
+      {/* Progress text (priority) or Sub message */}
+      {progressText ? (
+        <p className="text-sm text-adventure-emerald font-sans text-center font-semibold">
+          {progressText}
+        </p>
+      ) : subMessage ? (
         <p className="text-sm text-gray-500 font-sans text-center">
           {subMessage}
         </p>
-      )}
+      ) : null}
 
       {/* Pixel dots animation */}
       <div className="flex gap-2">
