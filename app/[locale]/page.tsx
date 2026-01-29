@@ -5,7 +5,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Compass, Zap, CheckCircle, XCircle, Camera, Video, Mic, Navigation, MessageSquare, ExternalLink, RefreshCw } from 'lucide-react';
 import { generateCampaign, verifyMedia, verifyMediaWithAppeal } from '@/lib/game-logic';
 import { geocodeLocation } from '@/lib/location';
-import { generateQuestImage } from '@/lib/gemini';
+import { generateQuestImage, generateQuestImageWithDetails } from '@/lib/gemini';
 import { Campaign, VerificationResult, DistanceRange, LocationData, Coordinates, AppealData, MediaCaptureData, XP_REWARDS, XP_DISTANCE_BONUS_PER_KM, getStreakBonus, QuestType, CampaignOptions, StoredCampaign } from '@/types';
 import { trackEvent } from '@/lib/analytics';
 import MediaScanner from '@/components/MediaScanner';
@@ -20,6 +20,7 @@ import LoadingProgress from '@/components/LoadingProgress';
 import QuestPreview from '@/components/QuestPreview';
 import ThinkingPanel from '@/components/ThinkingPanel';
 import CollapsibleToolbar from '@/components/CollapsibleToolbar';
+import ImageGenerationError, { ImageErrorDetails } from '@/components/ImageGenerationError';
 import {
   getCurrentCampaignId,
   loadCampaign,
@@ -73,6 +74,13 @@ export default function Home() {
   // Image Generation Progress State
   const [imageProgress, setImageProgress] = useState<{current: number, total: number} | null>(null);
 
+  // Image Generation Error State
+  const [imageGenErrors, setImageGenErrors] = useState<ImageErrorDetails[]>([]);
+  const [retryingImages, setRetryingImages] = useState<Set<string>>(new Set());
+
+  // Background Tab State
+  const [isPausedDueToBackground, setIsPausedDueToBackground] = useState(false);
+
   // Quest Book State
   const [showQuestBook, setShowQuestBook] = useState(false);
   const [campaignHistory, setCampaignHistory] = useState<StoredCampaign[]>([]);
@@ -120,6 +128,58 @@ export default function Home() {
 
   // Initialize unit preference hook
   const { unitSystem, toggleUnit } = useUnitPreference();
+
+  // Generate placeholder image based on location type
+  const generatePlaceholderImage = (quest: { title: string; locationHint: string }): string => {
+    const canvas = document.createElement('canvas');
+    canvas.width = 800;
+    canvas.height = 450;
+    const ctx = canvas.getContext('2d');
+
+    if (!ctx) return '';
+
+    // Determine gradient colors based on location type
+    const locationLower = quest.locationHint.toLowerCase();
+    let gradientColors: [string, string] = ['#10b981', '#065f46']; // Default: emerald green
+
+    if (locationLower.includes('park') || locationLower.includes('nature') || locationLower.includes('forest') || locationLower.includes('garden')) {
+      gradientColors = ['#10b981', '#065f46']; // Emerald green
+    } else if (locationLower.includes('water') || locationLower.includes('beach') || locationLower.includes('lake') || locationLower.includes('river')) {
+      gradientColors = ['#0ea5e9', '#0369a1']; // Blue
+    } else if (locationLower.includes('city') || locationLower.includes('urban') || locationLower.includes('street') || locationLower.includes('building')) {
+      gradientColors = ['#64748b', '#334155']; // Gray/blue
+    } else if (locationLower.includes('mountain') || locationLower.includes('hill')) {
+      gradientColors = ['#78716c', '#44403c']; // Stone gray
+    }
+
+    // Create gradient
+    const gradient = ctx.createLinearGradient(0, 0, 0, canvas.height);
+    gradient.addColorStop(0, gradientColors[0]);
+    gradient.addColorStop(1, gradientColors[1]);
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+    // Add subtle pattern for texture
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+    for (let i = 0; i < canvas.width; i += 20) {
+      for (let j = 0; j < canvas.height; j += 20) {
+        if ((i + j) % 40 === 0) {
+          ctx.fillRect(i, j, 10, 10);
+        }
+      }
+    }
+
+    // Add quest title overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
+    ctx.fillRect(0, canvas.height - 80, canvas.width, 80);
+
+    ctx.fillStyle = '#fbbf24'; // Gold
+    ctx.font = 'bold 24px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(quest.title, canvas.width / 2, canvas.height - 35);
+
+    return canvas.toDataURL('image/png');
+  };
 
   // Update GPS state when geolocation changes
   useEffect(() => {
@@ -197,6 +257,25 @@ export default function Home() {
     }
   }, [isLoading, campaign]);
 
+  // Handle page visibility changes (background tab detection)
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.hidden && (isLoading || isResuming)) {
+        // User switched away while generation is in progress
+        setIsPausedDueToBackground(true);
+      } else if (!document.hidden) {
+        // User came back
+        setIsPausedDueToBackground(false);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [isLoading, isResuming]);
+
   const handleGeocodeLocation = async () => {
     if (!location.trim()) return;
 
@@ -242,18 +321,50 @@ export default function Home() {
       setImageProgress(null);
 
       try {
-        // Sequential regeneration with progress tracking
-        for (let i = 0; i < questsNeedingImages.length; i++) {
-          const quest = questsNeedingImages[i];
-          setImageProgress({ current: i + 1, total: questsNeedingImages.length });
+        // Parallel regeneration with live progress tracking
+        let completedCount = 0;
+        const newErrors: ImageErrorDetails[] = [];
 
+        const imagePromises = questsNeedingImages.map(async (quest) => {
           try {
-            const imageUrl = await generateQuestImage(quest, 30000);
-            quest.imageUrl = imageUrl || undefined;
+            const result = await generateQuestImageWithDetails(quest, 30000, 1);
+            completedCount++;
+            setImageProgress({ current: completedCount, total: questsNeedingImages.length });
+
+            if (result.url) {
+              quest.imageUrl = result.url;
+            } else {
+              // First failure - track for retry UI
+              quest.imageUrl = undefined;
+              if (result.error) {
+                newErrors.push({
+                  questId: quest.id,
+                  questTitle: quest.title,
+                  errorType: result.error,
+                  retries: 1
+                });
+              }
+            }
           } catch {
             // Continue even if image fails
+            completedCount++;
+            setImageProgress({ current: completedCount, total: questsNeedingImages.length });
             quest.imageUrl = undefined;
+            newErrors.push({
+              questId: quest.id,
+              questTitle: quest.title,
+              errorType: 'unknown',
+              retries: 1
+            });
           }
+          return quest;
+        });
+
+        await Promise.all(imagePromises);
+
+        // Set errors after all attempts complete
+        if (newErrors.length > 0) {
+          setImageGenErrors(newErrors);
         }
       } catch {
         // Failed to regenerate images
@@ -282,7 +393,12 @@ export default function Home() {
     "RESTORING YOUR ADVENTURE...",
     "LOADING QUEST DATA...",
     "REGENERATING QUEST IMAGES...",
-    "PREPARING YOUR JOURNEY..."
+    "PREPARING YOUR JOURNEY...",
+    "ALMOST THERE...",
+    "PERFECTING THE DETAILS...",
+    "FINAL TOUCHES...",
+    "CRAFTING PIXEL PERFECTION...",
+    "WORTH THE WAIT..."
   ];
 
   const GENERATE_MESSAGES = [
@@ -312,6 +428,72 @@ export default function Home() {
     setSavedCampaignId(null);
   };
 
+  const handleRetryImage = async (questId: string) => {
+    if (!campaign) return;
+
+    // Mark as retrying
+    setRetryingImages(prev => new Set(prev).add(questId));
+
+    // Find the quest
+    const quest = campaign.quests.find(q => q.id === questId);
+    if (!quest) return;
+
+    try {
+      // Retry with extended 45s timeout
+      const result = await generateQuestImageWithDetails(quest, 45000, 1);
+
+      if (result.url) {
+        // Success! Update the quest
+        quest.imageUrl = result.url;
+        setCampaign({ ...campaign });
+
+        // Remove from errors
+        setImageGenErrors(prev => prev.filter(e => e.questId !== questId));
+      } else {
+        // Still failed - update error with new attempt count
+        setImageGenErrors(prev =>
+          prev.map(e =>
+            e.questId === questId
+              ? { ...e, retries: e.retries + 1, errorType: result.error || 'unknown' }
+              : e
+          )
+        );
+      }
+    } catch {
+      // Retry failed
+      setImageGenErrors(prev =>
+        prev.map(e =>
+          e.questId === questId ? { ...e, retries: e.retries + 1 } : e
+        )
+      );
+    } finally {
+      // Remove from retrying set
+      setRetryingImages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(questId);
+        return newSet;
+      });
+    }
+  };
+
+  const handleUsePlaceholder = (questId: string) => {
+    if (!campaign) return;
+
+    const quest = campaign.quests.find(q => q.id === questId);
+    if (!quest) return;
+
+    // Generate and use placeholder
+    quest.imageUrl = generatePlaceholderImage(quest);
+    setCampaign({ ...campaign });
+
+    // Remove from errors
+    setImageGenErrors(prev => prev.filter(e => e.questId !== questId));
+  };
+
+  const handleDismissError = (questId: string) => {
+    setImageGenErrors(prev => prev.filter(e => e.questId !== questId));
+  };
+
   const startAdventure = async (type: 'short' | 'long') => {
     if (!geocodedLocation || !distanceRange) return;
 
@@ -320,6 +502,7 @@ export default function Home() {
     setCompletedQuests([]);
     resetSessionContext();
     setImageProgress(null);
+    setImageGenErrors([]);
 
     setIsLoading(true);
     try {
@@ -336,7 +519,11 @@ export default function Home() {
       // Use geocodedLocation.name to pass to generateCampaign (which will geocode again)
       // The function will re-geocode, but we've already confirmed the location is valid
       const newCampaign = await generateCampaign(geocodedLocation.name, type, distanceRange, campaignOptions);
+
+      // Show campaign immediately - images are already generated by generateCampaign
       setCampaign(newCampaign);
+      setIsLoading(false);
+      setImageProgress(null);
       window.scrollTo({ top: 0, behavior: 'smooth' });
 
       // Track campaign creation
@@ -350,6 +537,9 @@ export default function Home() {
         }
       });
     } catch (error: unknown) {
+      setIsLoading(false);
+      setImageProgress(null);
+
       const errorMessage = error instanceof Error ? error.message : 'Failed to initialize adventure.';
       // Show user-friendly error without exposing technical details
       if (errorMessage.includes('API key')) {
@@ -357,9 +547,6 @@ export default function Home() {
       } else {
         alert('Failed to create adventure. Please try again.');
       }
-    } finally {
-      setIsLoading(false);
-      setImageProgress(null);
     }
   };
 
@@ -684,6 +871,22 @@ export default function Home() {
           </motion.div>
         )}
 
+        {/* Image Generation Errors */}
+        {imageGenErrors.length > 0 && campaign && (
+          <div className="space-y-3 mb-6">
+            {imageGenErrors.map(error => (
+              <ImageGenerationError
+                key={error.questId}
+                error={error}
+                onRetry={handleRetryImage}
+                onUsePlaceholder={handleUsePlaceholder}
+                onDismiss={handleDismissError}
+                isRetrying={retryingImages.has(error.questId)}
+              />
+            ))}
+          </div>
+        )}
+
         <AnimatePresence mode="wait">
           {isScanning && campaign && (
             <MediaScanner
@@ -823,6 +1026,22 @@ export default function Home() {
               {/* Loading State */}
               {isLoading && (
                 <div ref={loadingRef}>
+                  {/* Background Tab Warning */}
+                  {isPausedDueToBackground && (
+                    <motion.div
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="mb-4 bg-blue-900/20 border-2 border-blue-500 rounded-lg p-4 text-center"
+                    >
+                      <p className="text-sm font-pixel text-blue-400 mb-1">
+                        ⏸ APP IN BACKGROUND
+                      </p>
+                      <p className="text-xs font-sans text-gray-300">
+                        Generation continues - switch back to see progress
+                      </p>
+                    </motion.div>
+                  )}
+
                   <LoadingProgress
                     message={isResuming ? "RESTORING YOUR ADVENTURE..." : "GENERATING YOUR ADVENTURE..."}
                     subMessage={isResuming ? "Loading your saved progress" : "Creating quests with Gemini 3"}
@@ -935,6 +1154,7 @@ export default function Home() {
                           src={currentQuest.imageUrl}
                           alt={currentQuest.title}
                           className="w-full h-full object-cover image-rendering-pixelated"
+                          loading="lazy"
                         />
                         {/* Quest Number Badge */}
                         <div className="absolute top-4 right-4 flex gap-2 z-10">
@@ -955,6 +1175,32 @@ export default function Home() {
                         </div>
                         {/* Gradient Overlay */}
                         <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/50 pointer-events-none" />
+                      </div>
+                    )}
+
+                    {/* Image Loading/Failed State */}
+                    {!currentQuest.imageUrl && (
+                      <div className="relative -mx-6 mb-6 quest-image-hero overflow-hidden bg-zinc-900 flex items-center justify-center">
+                        <div className="text-center py-12">
+                          <div className="w-12 h-12 border-4 border-adventure-gold border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                          <p className="text-xs font-pixel text-gray-500">LOADING IMAGE...</p>
+                        </div>
+                        {/* Quest Number Badge - still show even when loading */}
+                        <div className="absolute top-4 right-4 flex gap-2 z-10">
+                          {currentQuest.questType && currentQuest.questType !== 'PHOTO' && (
+                            <div className={`bg-black/80 border-2 px-2 py-1 rounded flex items-center gap-1 ${
+                              currentQuest.questType === 'VIDEO' ? 'border-red-500 text-red-400' : 'border-purple-500 text-purple-400'
+                            }`}>
+                              {currentQuest.questType === 'VIDEO' ? <Video className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                              <span className="font-pixel text-xs">{currentQuest.questType}</span>
+                            </div>
+                          )}
+                          <div className="bg-black/80 border-2 border-adventure-gold px-3 py-1 rounded">
+                            <span className="font-pixel text-adventure-gold text-xs">
+                              {questNumber}/{totalQuests}
+                            </span>
+                          </div>
+                        </div>
                       </div>
                     )}
 

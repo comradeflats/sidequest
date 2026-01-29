@@ -39,11 +39,27 @@ export default function LoadingProgress({
 }: LoadingProgressProps) {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [iconIndex, setIconIndex] = useState(0);
+  const [elapsedTime, setElapsedTime] = useState(0);
 
   const messages = rotatingMessages || DEFAULT_ROTATING_MESSAGES;
   const displayMessage = rotatingMessages ? messages[currentMessageIndex] : message;
 
-  // Rotate through messages every 2.5 seconds
+  // Track elapsed time for duration-adaptive messaging
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setElapsedTime((prev) => prev + 1);
+    }, 1000);
+    return () => clearInterval(timer);
+  }, []);
+
+  // Adaptive rotation speed based on elapsed time
+  const getRotationInterval = () => {
+    if (elapsedTime < 30) return 4000; // 0-30s: Standard (4s)
+    if (elapsedTime < 60) return 6000; // 30-60s: Slower (6s)
+    return 8000; // 60s+: Even slower (8s)
+  };
+
+  // Rotate through messages with adaptive speed
   useEffect(() => {
     if (!rotatingMessages && !message.includes("GENERATING")) {
       // Don't rotate if not using rotating messages and not generating
@@ -52,7 +68,7 @@ export default function LoadingProgress({
 
     const messageInterval = setInterval(() => {
       setCurrentMessageIndex((prev) => (prev + 1) % messages.length);
-    }, 4000);
+    }, getRotationInterval());
 
     const iconInterval = setInterval(() => {
       setIconIndex((prev) => (prev + 1) % LOGO_ICONS.length);
@@ -62,7 +78,7 @@ export default function LoadingProgress({
       clearInterval(messageInterval);
       clearInterval(iconInterval);
     };
-  }, [rotatingMessages, message, messages.length]);
+  }, [rotatingMessages, message, messages.length, elapsedTime]);
 
   const IconComponent = LOGO_ICONS[iconIndex];
 

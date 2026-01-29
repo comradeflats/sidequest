@@ -44,12 +44,34 @@ export const getModel = (type: 'campaign' | 'verification' | 'image' = 'verifica
   });
 };
 
+// Track first image generation time for adaptive timeout
+let firstImageGenerationTime: number | null = null;
+
+export type ImageGenerationError = 'timeout' | 'quota' | 'unknown' | null;
+
+export interface ImageGenerationResult {
+  url: string | null;
+  error: ImageGenerationError;
+  duration?: number;
+}
+
 export async function generateQuestImage(
   quest: Quest,
   timeout: number = 30000,
-  retries: number = 1
+  retries: number = 1,
+  adaptiveTimeout: boolean = true
 ): Promise<string | null> {
   let lastError: Error | null = null;
+
+  // Adaptive timeout based on first successful generation
+  let effectiveTimeout = timeout;
+  if (adaptiveTimeout && firstImageGenerationTime !== null) {
+    if (firstImageGenerationTime < 15000) {
+      // First image was fast, reduce timeout for subsequent images
+      effectiveTimeout = 20000;
+    }
+    // If first image took 25-30s, keep 30s timeout (default behavior)
+  }
 
   // Try with retry logic
   for (let attempt = 0; attempt <= retries; attempt++) {
@@ -57,44 +79,35 @@ export async function generateQuestImage(
       const model = getModel('image');
 
       const prompt = `
-        Create a 16-bit pixel art scene for this location-based quest.
+        Create a 16-bit pixel art scene for this quest.
 
-        Quest Context: ${quest.narrative}
-        Location Type: ${quest.locationHint}
+        Quest: ${quest.narrative}
+        Location: ${quest.locationHint}
 
-        CRITICAL REQUIREMENTS:
-        - NO TEXT OR WORDS anywhere in the image
-        - Purely visual atmospheric scene depicting the location
-        - 16-bit SNES/Genesis era pixel art style
-        - Vibrant retro game colors
-        - Landscape orientation (16:9 ratio)
-        - Atmospheric and evocative
-        - Should feel like a scene from a classic adventure game
+        Style: 16-bit SNES/Genesis pixel art, landscape 16:9 ratio
+        Atmosphere: Evocative scene like a classic adventure game
 
-        Color Palette Guidelines:
-        - Use emerald green (#10b981) for natural elements (foliage, grass)
-        - Use warm golds (#fbbf24) and ambers for highlights and sunlight
-        - Rich, saturated colors typical of 16-bit era games
-        - Deep shadows for dramatic contrast
+        Colors:
+        - Emerald green (#10b981) for nature
+        - Warm gold (#fbbf24) for highlights/sunlight
+        - Rich saturated colors with deep shadows
 
-        Composition:
-        - Clear focal point representing the quest location or objective
-        - Depth through parallax-style layering (foreground, midground, background)
-        - Frame-worthy composition suitable for a hero image
-        - Evocative atmosphere that hints at the adventure
+        Composition: Clear focal point, parallax layering (foreground/midground/background)
 
-        The image must be entirely visual - NO letters, numbers, signs, or text of any kind.
-        Focus on creating a beautiful, atmospheric pixel art scene.
+        CRITICAL: NO text, letters, numbers, or words anywhere in the image.
       `;
 
       // Track Image Generation Cost
       costEstimator.trackGeminiImageGen();
 
+      // Track generation time for adaptive timeout
+      const startTime = Date.now();
+
       // Use Promise.race to enforce timeout
       const result = await Promise.race([
         model.generateContent(prompt),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout')), timeout)
+          setTimeout(() => reject(new Error('Timeout')), effectiveTimeout)
         )
       ]);
 
@@ -106,6 +119,12 @@ export async function generateQuestImage(
       if (imagePart?.inlineData) {
         const mimeType = imagePart.inlineData.mimeType || 'image/png';
         const base64Data = imagePart.inlineData.data;
+
+        // Track first successful generation time for adaptive timeout
+        if (firstImageGenerationTime === null && adaptiveTimeout) {
+          firstImageGenerationTime = Date.now() - startTime;
+        }
+
         return `data:${mimeType};base64,${base64Data}`;
       }
 
@@ -118,11 +137,116 @@ export async function generateQuestImage(
         break;
       }
 
-      // Wait before retry (exponential backoff)
-      await new Promise(resolve => setTimeout(resolve, 1000 * (attempt + 1)));
+      // Wait before retry (exponential backoff starting at 2s)
+      await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
     }
   }
 
-  // All attempts failed
+  // All attempts failed - return null for backward compatibility
+  // Error type is tracked in lastError for future enhancement
   return null;
+}
+
+/**
+ * Generate quest image with detailed error information
+ * Used for enhanced error handling and retry UI
+ */
+export async function generateQuestImageWithDetails(
+  quest: Quest,
+  timeout: number = 30000,
+  retries: number = 1,
+  adaptiveTimeout: boolean = true
+): Promise<ImageGenerationResult> {
+  let lastError: Error | null = null;
+
+  // Adaptive timeout based on first successful generation
+  let effectiveTimeout = timeout;
+  if (adaptiveTimeout && firstImageGenerationTime !== null) {
+    if (firstImageGenerationTime < 15000) {
+      effectiveTimeout = 20000;
+    }
+  }
+
+  const overallStartTime = Date.now();
+
+  // Try with retry logic
+  for (let attempt = 0; attempt <= retries; attempt++) {
+    try {
+      const model = getModel('image');
+
+      const prompt = `
+        Create a 16-bit pixel art scene for this quest.
+
+        Quest: ${quest.narrative}
+        Location: ${quest.locationHint}
+
+        Style: 16-bit SNES/Genesis pixel art, landscape 16:9 ratio
+        Atmosphere: Evocative scene like a classic adventure game
+
+        Colors:
+        - Emerald green (#10b981) for nature
+        - Warm gold (#fbbf24) for highlights/sunlight
+        - Rich saturated colors with deep shadows
+
+        Composition: Clear focal point, parallax layering (foreground/midground/background)
+
+        CRITICAL: NO text, letters, numbers, or words anywhere in the image.
+      `;
+
+      costEstimator.trackGeminiImageGen();
+
+      const startTime = Date.now();
+
+      const result = await Promise.race([
+        model.generateContent(prompt),
+        new Promise<never>((_, reject) =>
+          setTimeout(() => reject(new Error('Timeout')), effectiveTimeout)
+        )
+      ]);
+
+      const response = await result.response;
+      const imagePart = response.candidates?.[0]?.content?.parts?.[0];
+
+      if (imagePart?.inlineData) {
+        const mimeType = imagePart.inlineData.mimeType || 'image/png';
+        const base64Data = imagePart.inlineData.data;
+
+        if (firstImageGenerationTime === null && adaptiveTimeout) {
+          firstImageGenerationTime = Date.now() - startTime;
+        }
+
+        return {
+          url: `data:${mimeType};base64,${base64Data}`,
+          error: null,
+          duration: Date.now() - overallStartTime
+        };
+      }
+
+      return { url: null, error: 'unknown' };
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error('Unknown error');
+
+      if (!lastError.message.includes('Timeout') || attempt === retries) {
+        break;
+      }
+
+      await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
+    }
+  }
+
+  // Determine error type from lastError
+  let errorType: ImageGenerationError = 'unknown';
+  if (lastError) {
+    if (lastError.message.includes('Timeout')) {
+      errorType = 'timeout';
+    } else if (lastError.message.includes('quota') || lastError.message.includes('limit')) {
+      errorType = 'quota';
+    }
+  }
+
+  return {
+    url: null,
+    error: errorType,
+    duration: Date.now() - overallStartTime
+  };
 }

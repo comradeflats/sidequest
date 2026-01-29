@@ -120,6 +120,17 @@ export async function getImageFromIndexedDB(
 }
 
 /**
+ * Get cached image for a quest (convenience function for smart caching)
+ * Alias for getImageFromIndexedDB with better naming for cache checks
+ */
+export async function getCachedImage(
+  campaignId: string,
+  questId: string
+): Promise<string | null> {
+  return getImageFromIndexedDB(campaignId, questId);
+}
+
+/**
  * Save all images for a campaign to IndexedDB
  */
 export async function saveCampaignImages(
