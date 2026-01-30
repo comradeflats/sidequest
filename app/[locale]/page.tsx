@@ -1046,6 +1046,11 @@ export default function Home() {
                     message={isResuming ? "RESTORING YOUR ADVENTURE..." : "GENERATING YOUR ADVENTURE..."}
                     subMessage={isResuming ? "Loading your saved progress" : "Creating quests with Gemini 3"}
                     rotatingMessages={isResuming ? RESUME_MESSAGES : GENERATE_MESSAGES}
+                    progress={
+                      imageProgress
+                        ? Math.round((imageProgress.current / imageProgress.total) * 100)
+                        : undefined
+                    }
                     progressText={
                       imageProgress
                         ? `Generating quest images... (${imageProgress.current}/${imageProgress.total})`

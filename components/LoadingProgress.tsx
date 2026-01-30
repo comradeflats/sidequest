@@ -52,23 +52,29 @@ export default function LoadingProgress({
     return () => clearInterval(timer);
   }, []);
 
-  // Adaptive rotation speed based on elapsed time
-  const getRotationInterval = () => {
+  // Determine current rotation speed tier based on elapsed time
+  // Only changes at specific thresholds to avoid constant re-renders
+  const getRotationSpeed = () => {
     if (elapsedTime < 30) return 4000; // 0-30s: Standard (4s)
     if (elapsedTime < 60) return 6000; // 30-60s: Slower (6s)
     return 8000; // 60s+: Even slower (8s)
   };
 
+  const rotationSpeed = getRotationSpeed();
+
   // Rotate through messages with adaptive speed
   useEffect(() => {
-    if (!rotatingMessages && !message.includes("GENERATING")) {
-      // Don't rotate if not using rotating messages and not generating
+    // When rotatingMessages is provided, always rotate
+    // When not provided, only rotate if message contains "GENERATING"
+    const shouldRotate = rotatingMessages || message.includes("GENERATING");
+
+    if (!shouldRotate) {
       return;
     }
 
     const messageInterval = setInterval(() => {
       setCurrentMessageIndex((prev) => (prev + 1) % messages.length);
-    }, getRotationInterval());
+    }, rotationSpeed);
 
     const iconInterval = setInterval(() => {
       setIconIndex((prev) => (prev + 1) % LOGO_ICONS.length);
@@ -78,7 +84,7 @@ export default function LoadingProgress({
       clearInterval(messageInterval);
       clearInterval(iconInterval);
     };
-  }, [rotatingMessages, message, messages.length, elapsedTime]);
+  }, [rotatingMessages, message, messages.length, rotationSpeed]);
 
   const IconComponent = LOGO_ICONS[iconIndex];
 
