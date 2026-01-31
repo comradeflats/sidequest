@@ -1369,7 +1369,7 @@ export default function Home() {
                         {(currentQuest.coordinates || currentQuest.placeName || currentQuest.title) && (
                           <button
                             className="w-full border-2 border-adventure-sky text-adventure-sky font-pixel py-3 px-6 rounded-lg hover:bg-adventure-sky/10 transition-colors flex items-center justify-center gap-2"
-                            onClick={() => viewQuestArea(currentQuest)}
+                            onClick={() => viewQuestArea(campaign.quests[campaign.currentQuestIndex])}
                             style={{ fontSize: '0.75rem' }}
                           >
                             <ExternalLink className="w-4 h-4" />
