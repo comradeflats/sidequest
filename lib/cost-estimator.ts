@@ -5,6 +5,10 @@ interface CostBreakdown {
   maps: number;
   gemini: number;
   total: number;
+  cacheHits?: number;
+  cacheMisses?: number;
+  cacheSavings?: number;
+  cacheHitRate?: number;
 }
 
 export class CostEstimator {
@@ -13,6 +17,11 @@ export class CostEstimator {
   private geminiCost = 0;
   private listeners: CostListener[] = [];
   private STORAGE_KEY = 'gemini_gameathon_cost';
+
+  // Prompt caching tracking (Gemini 3 optimization feature)
+  private cacheHits = 0;
+  private cacheMisses = 0;
+  private cacheSavings = 0; // Amount saved in USD from cache hits
 
   // Pricing Constants (Estimated)
   // Based on Google Cloud Pricing as of Jan 2026 (projected/current)
@@ -54,6 +63,9 @@ export class CostEstimator {
         this.totalCost = data.total || 0;
         this.mapsCost = data.maps || 0;
         this.geminiCost = data.gemini || 0;
+        this.cacheHits = data.cacheHits || 0;
+        this.cacheMisses = data.cacheMisses || 0;
+        this.cacheSavings = data.cacheSavings || 0;
       }
     } catch (e) {
       // Ignore parsing errors
@@ -65,25 +77,45 @@ export class CostEstimator {
       const data = {
         total: this.totalCost,
         maps: this.mapsCost,
-        gemini: this.geminiCost
+        gemini: this.geminiCost,
+        cacheHits: this.cacheHits,
+        cacheMisses: this.cacheMisses,
+        cacheSavings: this.cacheSavings
       };
       localStorage.setItem(this.STORAGE_KEY, JSON.stringify(data));
     }
   }
 
   private notify() {
+    const totalCacheRequests = this.cacheHits + this.cacheMisses;
+    const cacheHitRate = totalCacheRequests > 0 ? (this.cacheHits / totalCacheRequests) * 100 : 0;
+
     const breakdown = {
       maps: this.mapsCost,
       gemini: this.geminiCost,
-      total: this.totalCost
+      total: this.totalCost,
+      cacheHits: this.cacheHits,
+      cacheMisses: this.cacheMisses,
+      cacheSavings: this.cacheSavings,
+      cacheHitRate: cacheHitRate
     };
     this.listeners.forEach(listener => listener(this.totalCost, breakdown));
   }
 
   public subscribe(listener: CostListener) {
     this.listeners.push(listener);
-    // Initial notify
-    listener(this.totalCost, { maps: this.mapsCost, gemini: this.geminiCost, total: this.totalCost });
+    // Initial notify with full breakdown
+    const totalCacheRequests = this.cacheHits + this.cacheMisses;
+    const cacheHitRate = totalCacheRequests > 0 ? (this.cacheHits / totalCacheRequests) * 100 : 0;
+    listener(this.totalCost, {
+      maps: this.mapsCost,
+      gemini: this.geminiCost,
+      total: this.totalCost,
+      cacheHits: this.cacheHits,
+      cacheMisses: this.cacheMisses,
+      cacheSavings: this.cacheSavings,
+      cacheHitRate: cacheHitRate
+    });
     return () => {
       this.listeners = this.listeners.filter(l => l !== listener);
     };
@@ -113,12 +145,25 @@ export class CostEstimator {
     this.save();
   }
 
-  public trackGeminiInput(charCount: number) {
+  public trackGeminiInput(charCount: number, cached: boolean = false) {
     // Approximation: 4 chars per token
     const tokens = charCount / 4;
     const cost = (tokens / 1_000_000) * this.PRICING.GEMINI_FLASH_INPUT_1M;
-    this.geminiCost += cost;
-    this.totalCost += cost;
+
+    if (cached) {
+      // Cached tokens cost ~90% less (typical cache discount)
+      const actualCost = cost * 0.1;
+      const savedCost = cost * 0.9;
+      this.geminiCost += actualCost;
+      this.totalCost += actualCost;
+      this.cacheSavings += savedCost;
+      this.cacheHits++;
+    } else {
+      this.geminiCost += cost;
+      this.totalCost += cost;
+      this.cacheMisses++;
+    }
+
     this.notify();
     this.save();
   }
@@ -169,6 +214,9 @@ export class CostEstimator {
     this.totalCost = 0;
     this.mapsCost = 0;
     this.geminiCost = 0;
+    this.cacheHits = 0;
+    this.cacheMisses = 0;
+    this.cacheSavings = 0;
     this.save();
     this.notify();
   }

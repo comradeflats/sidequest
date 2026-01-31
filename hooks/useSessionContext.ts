@@ -8,12 +8,17 @@ import {
   loadSessionContext,
   clearSessionContext,
   buildContextPrompt,
-  buildVerificationContextHint
+  buildVerificationContextHint,
+  estimateContextTokens,
+  getContextTokenBreakdown,
+  ContextTokenBreakdown
 } from '@/lib/session-context';
-import { ThinkingStep, QuestType } from '@/types';
+import { ThinkingStep, QuestType, Campaign, JourneyStats } from '@/types';
 
 interface UseSessionContextProps {
   campaignId: string | null;
+  campaign?: Campaign | null;  // Pass full campaign for location research
+  journeyStats?: JourneyStats | null;  // Pass journey stats for analytics
   enabled?: boolean;
 }
 
@@ -30,6 +35,7 @@ interface UseSessionContextReturn {
     feedback: string;
     thinkingSteps?: ThinkingStep[];
     distanceFromTarget?: number;
+    questImageUrl?: string;        // Quest image for context
   }) => void;
 
   // Start a new attempt on a quest (increments attempt count)
@@ -41,12 +47,20 @@ interface UseSessionContextReturn {
   // Get brief hint for verification
   getVerificationHint: () => string;
 
+  // Get estimated token usage for context window showcase
+  getContextTokenCount: () => number;
+
+  // Get detailed token breakdown for visualization
+  getTokenBreakdown: () => ContextTokenBreakdown;
+
   // Reset context (for new campaign)
   resetContext: () => void;
 }
 
 export function useSessionContext({
   campaignId,
+  campaign,
+  journeyStats,
   enabled = true
 }: UseSessionContextProps): UseSessionContextReturn {
   const [context, setContext] = useState<SessionContext | null>(null);
@@ -101,7 +115,8 @@ export function useSessionContext({
     success,
     feedback,
     thinkingSteps,
-    distanceFromTarget
+    distanceFromTarget,
+    questImageUrl
   }: {
     questId: string;
     questTitle: string;
@@ -110,6 +125,7 @@ export function useSessionContext({
     feedback: string;
     thinkingSteps?: ThinkingStep[];
     distanceFromTarget?: number;
+    questImageUrl?: string;
   }) => {
     if (!context) return;
 
@@ -133,7 +149,8 @@ export function useSessionContext({
       timeSpent: existingAttempt
         ? existingAttempt.timeSpent + timeSpent
         : timeSpent,
-      distanceFromTarget
+      distanceFromTarget,
+      questImageUrl: questImageUrl || existingAttempt?.questImageUrl  // Preserve image from first attempt
     };
 
     const updatedContext = updateSessionContext(context, attempt);
@@ -143,14 +160,35 @@ export function useSessionContext({
   // Get context prompt for AI
   const getContextPrompt = useCallback(() => {
     if (!context) return '';
-    return buildContextPrompt(context);
-  }, [context]);
+    return buildContextPrompt(context, campaign || undefined, journeyStats || undefined);
+  }, [context, campaign, journeyStats]);
 
   // Get brief hint for verification
   const getVerificationHint = useCallback(() => {
     if (!context) return '';
-    return buildVerificationContextHint(context);
-  }, [context]);
+    return buildVerificationContextHint(context, campaign || undefined);
+  }, [context, campaign]);
+
+  // Get estimated token count for context window showcase
+  const getContextTokenCount = useCallback(() => {
+    if (!context) return 0;
+    return estimateContextTokens(context, campaign || undefined, journeyStats || undefined);
+  }, [context, campaign, journeyStats]);
+
+  // Get detailed token breakdown for visualization
+  const getTokenBreakdown = useCallback((): ContextTokenBreakdown => {
+    if (!context) {
+      return {
+        total: 0,
+        baseText: 0,
+        images: 0,
+        journey: 0,
+        research: 0,
+        reasoning: 0
+      };
+    }
+    return getContextTokenBreakdown(context, campaign || undefined, journeyStats || undefined);
+  }, [context, campaign, journeyStats]);
 
   // Reset context for new campaign
   const resetContext = useCallback(() => {
@@ -170,6 +208,8 @@ export function useSessionContext({
     startAttempt,
     getContextPrompt,
     getVerificationHint,
+    getContextTokenCount,
+    getTokenBreakdown,
     resetContext
   };
 }

@@ -84,16 +84,51 @@ export default function MediaScanner({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRecording, maxDuration]);
 
+  // Optimize image: resize and compress before sending to API
+  const optimizeImage = useCallback(async (imageSrc: string): Promise<string> => {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => {
+        // Create canvas for resizing
+        const canvas = document.createElement('canvas');
+        const ctx = canvas.getContext('2d')!;
+
+        // Calculate new dimensions (max 1024px width while maintaining aspect ratio)
+        const maxWidth = 1024;
+        let width = img.width;
+        let height = img.height;
+
+        if (width > maxWidth) {
+          height = (height * maxWidth) / width;
+          width = maxWidth;
+        }
+
+        canvas.width = width;
+        canvas.height = height;
+
+        // Draw resized image
+        ctx.drawImage(img, 0, 0, width, height);
+
+        // Convert to JPEG with 85% quality for optimal size/quality balance
+        const optimizedSrc = canvas.toDataURL('image/jpeg', 0.85);
+        resolve(optimizedSrc);
+      };
+      img.src = imageSrc;
+    });
+  }, []);
+
   // Capture photo
-  const capturePhoto = useCallback(() => {
+  const capturePhoto = useCallback(async () => {
     const imageSrc = webcamRef.current?.getScreenshot();
     if (imageSrc) {
+      // Optimize image before sending (resize + compress for 2-5s faster upload/processing)
+      const optimizedImage = await optimizeImage(imageSrc);
       onCapture({
         type: 'photo',
-        data: imageSrc
+        data: optimizedImage
       });
     }
-  }, [webcamRef, onCapture]);
+  }, [webcamRef, onCapture, optimizeImage]);
 
   // Start video/audio recording
   const startRecording = useCallback(async () => {
@@ -143,7 +178,16 @@ export default function MediaScanner({
             ? 'audio/webm;codecs=opus'
             : 'audio/webm');
 
-      const mediaRecorder = new MediaRecorder(stream, { mimeType });
+      // Configure MediaRecorder with bitrate constraints for faster upload/processing
+      const recorderOptions: MediaRecorderOptions = {
+        mimeType,
+        // Limit bitrate to 2.5 Mbps for video, 128 kbps for audio
+        // Balances quality with file size for faster API processing
+        videoBitsPerSecond: questType === 'VIDEO' ? 2500000 : undefined,
+        audioBitsPerSecond: 128000
+      };
+
+      const mediaRecorder = new MediaRecorder(stream, recorderOptions);
       mediaRecorderRef.current = mediaRecorder;
 
       mediaRecorder.ondataavailable = (event) => {

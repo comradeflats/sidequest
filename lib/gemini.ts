@@ -8,7 +8,9 @@ const genAI = new GoogleGenerativeAI(API_KEY);
 // Model config type
 interface ModelConfig {
   safetySettings: Array<{ category: HarmCategory; threshold: HarmBlockThreshold }>;
-  generationConfig?: { responseMimeType: string };
+  generationConfig?: {
+    responseMimeType: string;
+  };
 }
 
 export const getModel = (type: 'campaign' | 'verification' | 'image' = 'verification') => {
@@ -24,13 +26,17 @@ export const getModel = (type: 'campaign' | 'verification' | 'image' = 'verifica
 
   switch(type) {
     case 'campaign':
-      // Using Flash for campaign generation - Pro not available on free tier
-      modelName = "gemini-3-flash-preview";
+      // Using Pro for campaign generation - showcase Gemini 3's powerful reasoning
+      modelName = "gemini-3-pro-preview";
       config.generationConfig = { responseMimeType: "application/json" };
       break;
     case 'verification':
-      modelName = "gemini-3-flash-preview";
-      config.generationConfig = { responseMimeType: "application/json" };
+      // Using Pro for verification - best multimodal understanding for photo/video/audio
+      // Extended thinking activated through detailed step-by-step prompts
+      modelName = "gemini-3-pro-preview";
+      config.generationConfig = {
+        responseMimeType: "application/json"
+      };
       break;
     case 'image':
       modelName = "gemini-3-pro-image-preview";
@@ -57,7 +63,7 @@ export interface ImageGenerationResult {
 
 export async function generateQuestImage(
   quest: Quest,
-  timeout: number = 30000,
+  timeout: number = 20000,
   retries: number = 1,
   adaptiveTimeout: boolean = true
 ): Promise<string | null> {
@@ -66,11 +72,11 @@ export async function generateQuestImage(
   // Adaptive timeout based on first successful generation
   let effectiveTimeout = timeout;
   if (adaptiveTimeout && firstImageGenerationTime !== null) {
-    if (firstImageGenerationTime < 15000) {
+    if (firstImageGenerationTime < 10000) {
       // First image was fast, reduce timeout for subsequent images
-      effectiveTimeout = 20000;
+      effectiveTimeout = 15000;
     }
-    // If first image took 25-30s, keep 30s timeout (default behavior)
+    // If first image took 15-20s, keep 20s timeout (default behavior)
   }
 
   // Try with retry logic
@@ -153,7 +159,7 @@ export async function generateQuestImage(
  */
 export async function generateQuestImageWithDetails(
   quest: Quest,
-  timeout: number = 30000,
+  timeout: number = 20000,
   retries: number = 1,
   adaptiveTimeout: boolean = true
 ): Promise<ImageGenerationResult> {
@@ -162,8 +168,8 @@ export async function generateQuestImageWithDetails(
   // Adaptive timeout based on first successful generation
   let effectiveTimeout = timeout;
   if (adaptiveTimeout && firstImageGenerationTime !== null) {
-    if (firstImageGenerationTime < 15000) {
-      effectiveTimeout = 20000;
+    if (firstImageGenerationTime < 10000) {
+      effectiveTimeout = 15000;
     }
   }
 

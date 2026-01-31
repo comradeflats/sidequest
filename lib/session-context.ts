@@ -1,4 +1,4 @@
-import { ThinkingStep, QuestType } from '@/types';
+import { ThinkingStep, QuestType, Campaign, JourneyStats, JourneyPoint } from '@/types';
 
 /**
  * Session Context Management for Gemini 3's 1M Token Context Window
@@ -16,6 +16,8 @@ export interface QuestAttempt {
   thinkingSteps?: ThinkingStep[];
   timeSpent: number; // seconds
   distanceFromTarget?: number;
+  questImageUrl?: string;        // Base64 data URL of quest image for context
+  imageDescription?: string;     // AI-generated description (optional)
 }
 
 // User behavior patterns computed from quest history
@@ -296,20 +298,28 @@ export function updateSessionContext(
 
 /**
  * Build context prompt for AI from session context
+ * GEMINI 3 SHOWCASE: Uses full campaign history to demonstrate 1M token context window
  * This is injected into Gemini prompts to enable personalized responses
  */
-export function buildContextPrompt(ctx: SessionContext): string {
+export function buildContextPrompt(ctx: SessionContext, campaign?: Campaign, journeyStats?: JourneyStats): string {
   if (ctx.questHistory.length === 0) {
     return '';
   }
 
-  const recentQuests = ctx.questHistory.slice(-3); // Last 3 quests for context
+  // GEMINI 3: Use FULL quest history (not just last 3) to showcase 1M token context window
+  const allQuests = ctx.questHistory;
 
   let prompt = `
-SESSION MEMORY (use to personalize your response naturally):
-- Quests completed: ${ctx.questHistory.length}
+GEMINI 3 MARATHON CONTEXT - FULL CAMPAIGN MEMORY:
+This context showcases Gemini 3's 1M token context window by maintaining complete campaign history.
+
+SESSION OVERVIEW:
+- Session ID: ${ctx.sessionId}
+- Campaign started: ${new Date(ctx.startedAt).toLocaleString()}
+- Total quests attempted: ${ctx.questHistory.length}
 - Success rate: ${(ctx.patterns.successRate * 100).toFixed(0)}%
 - Average attempts per quest: ${ctx.patterns.averageAttemptsPerQuest.toFixed(1)}
+- Average AI confidence: ${ctx.patterns.averageConfidence}%
 `;
 
   if (ctx.patterns.strongestMediaType) {
@@ -325,42 +335,270 @@ SESSION MEMORY (use to personalize your response naturally):
   }
 
   prompt += `
-Recent quest history:
+COMPLETE QUEST HISTORY (showcasing full context):
 `;
 
-  for (const q of recentQuests) {
-    prompt += `- "${q.questTitle}" (${q.questType}): ${q.finalSuccess ? 'Completed' : 'Failed'} in ${q.attempts} attempt(s)`;
-    if (q.verificationFeedback.length > 0) {
-      prompt += ` - "${q.verificationFeedback[q.verificationFeedback.length - 1]}"`;
+  // Include ALL quest attempts with detailed feedback and thinking steps
+  for (const q of allQuests) {
+    prompt += `\nQuest: "${q.questTitle}" (${q.questType})
+- Status: ${q.finalSuccess ? '✓ Completed' : '✗ Failed'} in ${q.attempts} attempt(s)
+- Time spent: ${q.timeSpent}s
+`;
+    if (q.distanceFromTarget !== undefined) {
+      prompt += `- GPS distance from target: ${q.distanceFromTarget.toFixed(0)}m\n`;
     }
-    prompt += '\n';
+
+    // Include quest image for visual context (Gemini 3 multimodal showcase)
+    if (q.questImageUrl) {
+      prompt += `- Quest reference image included (base64 encoded for visual context)\n`;
+      // Note: The actual image will be included separately in multimodal API calls
+      // This is a text marker to indicate image presence
+    }
+
+    // Include verification feedback history
+    if (q.verificationFeedback.length > 0) {
+      prompt += `- Feedback history:\n`;
+      q.verificationFeedback.forEach((fb, i) => {
+        prompt += `  ${i + 1}. "${fb}"\n`;
+      });
+    }
+
+    // Include thinking steps for deeper context
+    if (q.thinkingSteps && q.thinkingSteps.length > 0) {
+      prompt += `- AI reasoning:\n`;
+      q.thinkingSteps.forEach((step) => {
+        prompt += `  - ${step.criterion}: ${step.passed ? 'Passed' : 'Failed'} (${step.confidence}%)\n`;
+      });
+    }
+  }
+
+  // GEMINI 3: Include location research for rich context (5-10K tokens)
+  if (campaign?.locationResearch && campaign.locationResearch.length > 0) {
+    prompt += `
+LOCATION INTELLIGENCE (Gemini 3 Context Window Showcase):
+Rich background research on quest locations to demonstrate deep contextual understanding.
+
+`;
+    for (const research of campaign.locationResearch) {
+      prompt += `\n=== ${research.placeName} ===\n\n`;
+      prompt += `HISTORICAL SIGNIFICANCE:\n${research.historicalSignificance}\n\n`;
+      prompt += `ARCHITECTURAL DETAILS:\n${research.architecturalDetails}\n\n`;
+      prompt += `CULTURAL CONTEXT:\n${research.culturalContext}\n\n`;
+      prompt += `MEDIA CAPTURE TIPS:\n${research.mediaTips}\n\n`;
+    }
+  }
+
+  // GEMINI 3: Include journey analytics for behavioral context (8-10K tokens)
+  if (journeyStats && journeyStats.pathPoints.length > 0) {
+    prompt += `
+JOURNEY ANALYTICS (Gemini 3 Context Window Showcase):
+Comprehensive tracking of the player's physical journey through the campaign.
+
+JOURNEY SUMMARY:
+- Total distance traveled: ${journeyStats.totalDistanceTraveled.toFixed(2)} km
+- Journey duration: ${journeyStats.durationMinutes} minutes
+- GPS path points captured: ${journeyStats.pathPoints.length}
+- Quests completed during journey: ${journeyStats.questCompletionTimes.length}
+`;
+
+    // GPS Path Visualization (sample recent points to avoid bloat)
+    const recentPoints = journeyStats.pathPoints.slice(-20); // Last 20 points
+    if (recentPoints.length > 0) {
+      prompt += `\nRECENT GPS PATH (last ${recentPoints.length} points):\n`;
+      for (const point of recentPoints) {
+        const timestamp = new Date(point.timestamp).toLocaleTimeString();
+        prompt += `- [${timestamp}] Quest ${point.questIndex + 1}: ${point.coordinates.lat.toFixed(5)}, ${point.coordinates.lng.toFixed(5)} (accuracy: ±${point.accuracy.toFixed(0)}m)\n`;
+      }
+    }
+
+    // Movement pattern analysis
+    if (journeyStats.pathPoints.length >= 2) {
+      const timeDiff = (new Date(journeyStats.pathPoints[journeyStats.pathPoints.length - 1].timestamp).getTime() -
+                       new Date(journeyStats.pathPoints[0].timestamp).getTime()) / 1000; // seconds
+      const avgSpeed = timeDiff > 0 ? (journeyStats.totalDistanceTraveled * 1000) / timeDiff : 0; // m/s
+
+      prompt += `\nMOVEMENT PATTERNS:\n`;
+      prompt += `- Average movement speed: ${avgSpeed.toFixed(2)} m/s (${(avgSpeed * 3.6).toFixed(1)} km/h)\n`;
+
+      if (avgSpeed < 0.5) {
+        prompt += `- Movement style: Stationary/minimal movement\n`;
+      } else if (avgSpeed < 1.5) {
+        prompt += `- Movement style: Slow walking pace\n`;
+      } else if (avgSpeed < 2.5) {
+        prompt += `- Movement style: Normal walking pace\n`;
+      } else {
+        prompt += `- Movement style: Brisk walking/running\n`;
+      }
+    }
+
+    // Temporal analysis (quest completion timing)
+    if (journeyStats.questCompletionTimes.length > 0) {
+      prompt += `\nQUEST COMPLETION TIMELINE:\n`;
+      for (let i = 0; i < journeyStats.questCompletionTimes.length; i++) {
+        const completionTime = new Date(journeyStats.questCompletionTimes[i]);
+        const elapsedMinutes = Math.round((completionTime.getTime() - journeyStats.startTime.getTime()) / 60000);
+
+        let timeToComplete = 'N/A';
+        if (i > 0) {
+          const prevTime = new Date(journeyStats.questCompletionTimes[i - 1]);
+          const minutes = Math.round((completionTime.getTime() - prevTime.getTime()) / 60000);
+          timeToComplete = `${minutes} minutes`;
+        }
+
+        prompt += `- Quest ${i + 1}: Completed at ${completionTime.toLocaleTimeString()} (${elapsedMinutes}min into journey, ${timeToComplete} from previous)\n`;
+      }
+    }
+
+    // Geographic coverage analysis
+    if (journeyStats.pathPoints.length >= 2) {
+      const latitudes = journeyStats.pathPoints.map(p => p.coordinates.lat);
+      const longitudes = journeyStats.pathPoints.map(p => p.coordinates.lng);
+      const latRange = Math.max(...latitudes) - Math.min(...latitudes);
+      const lngRange = Math.max(...longitudes) - Math.min(...longitudes);
+      const avgAccuracy = journeyStats.pathPoints.reduce((sum, p) => sum + p.accuracy, 0) / journeyStats.pathPoints.length;
+
+      prompt += `\nGEOGRAPHIC COVERAGE:\n`;
+      prompt += `- Latitude range: ${latRange.toFixed(5)}° (${(latRange * 111).toFixed(2)} km)\n`;
+      prompt += `- Longitude range: ${lngRange.toFixed(5)}° (${(lngRange * 111).toFixed(2)} km)\n`;
+      prompt += `- Average GPS accuracy: ±${avgAccuracy.toFixed(0)}m\n`;
+
+      if (latRange < 0.01 && lngRange < 0.01) {
+        prompt += `- Exploration pattern: Localized (stayed in small area)\n`;
+      } else if (latRange < 0.05 && lngRange < 0.05) {
+        prompt += `- Exploration pattern: Neighborhood exploration\n`;
+      } else {
+        prompt += `- Exploration pattern: Wide-ranging journey\n`;
+      }
+    }
+  }
+
+  // GEMINI 3: Include campaign generation reasoning (5-6K tokens)
+  if (campaign?.generationReasoning) {
+    const reasoning = campaign.generationReasoning;
+
+    prompt += `
+CAMPAIGN DESIGN REASONING (Gemini 3 Context Window Showcase):
+The AI's thought process during campaign generation to demonstrate extended thinking.
+
+DIFFICULTY PROGRESSION STRATEGY:
+${reasoning.difficultyProgression}
+
+LOCATION SELECTION RATIONALE:
+`;
+    reasoning.locationSelection.forEach((reason, i) => {
+      prompt += `Quest ${i + 1}: ${reason}\n`;
+    });
+
+    prompt += `
+MEDIA TYPE CHOICES:
+`;
+    reasoning.mediaTypeChoices.forEach((reason, i) => {
+      prompt += `Quest ${i + 1}: ${reason}\n`;
+    });
+
+    prompt += `
+CRITERIA DESIGN RATIONALE:
+`;
+    reasoning.criteriaDesign.forEach((reason, i) => {
+      prompt += `Quest ${i + 1}: ${reason}\n`;
+    });
   }
 
   prompt += `
-PERSONALITY GUIDELINES:
+PERSONALITY CONTEXT:
 - Voice: ${ctx.thoughtSignature.narrativeVoice}
 - Encouragement level: ${ctx.thoughtSignature.encouragementLevel}
+- Reference style: ${ctx.thoughtSignature.referenceStyle}
 `;
 
   if (ctx.thoughtSignature.playerNickname) {
-    prompt += `- You can occasionally call them "${ctx.thoughtSignature.playerNickname}"\n`;
+    prompt += `- Player nickname: "${ctx.thoughtSignature.playerNickname}"\n`;
   }
 
   if (ctx.thoughtSignature.runningJokes.length > 0) {
-    prompt += `- Running jokes to subtly reference when appropriate: ${ctx.thoughtSignature.runningJokes.join('; ')}\n`;
+    prompt += `- Running jokes: ${ctx.thoughtSignature.runningJokes.join('; ')}\n`;
   }
 
   prompt += `
-IMPORTANT: Reference past quests naturally, not forcefully. Only mention history when relevant.
+CONTEXT USAGE NOTE: This full campaign history is maintained in Gemini 3's 1M token context window,
+allowing the AI to reference any past quest, learn from patterns, and provide deeply personalized feedback.
+Reference past quests naturally when they provide useful learning context.
 `;
 
   return prompt;
 }
 
 /**
+ * Context token breakdown for detailed visualization
+ */
+export interface ContextTokenBreakdown {
+  total: number;
+  baseText: number;
+  images: number;
+  journey: number;      // Journey analytics tokens
+  research: number;     // Location research tokens
+  reasoning: number;    // Campaign reasoning tokens (will be populated in Task #5)
+}
+
+/**
+ * Estimate token count for context (rough approximation: ~4 chars per token)
+ * GEMINI 3 SHOWCASE: Includes quest images (~2-3K tokens each), location research, and journey analytics
+ */
+export function estimateContextTokens(ctx: SessionContext, campaign?: Campaign, journeyStats?: JourneyStats): number {
+  const breakdown = getContextTokenBreakdown(ctx, campaign, journeyStats);
+  return breakdown.total;
+}
+
+/**
+ * Get detailed token breakdown for context window showcase
+ * GEMINI 3 FEATURE: Demonstrates multimodal context usage
+ */
+export function getContextTokenBreakdown(ctx: SessionContext, campaign?: Campaign, journeyStats?: JourneyStats): ContextTokenBreakdown {
+  const contextPrompt = buildContextPrompt(ctx, campaign, journeyStats);
+
+  // Count quest images (each base64 image ~2500 tokens on average)
+  const imageCount = ctx.questHistory.filter(q => q.questImageUrl).length;
+  const imageTokens = imageCount * 2500;
+
+  // Journey analytics tokens (estimated based on pathPoints count)
+  const journeyTokens = journeyStats && journeyStats.pathPoints.length > 0
+    ? Math.ceil(
+        500 + // Base journey summary
+        (Math.min(journeyStats.pathPoints.length, 20) * 30) + // GPS points (30 tokens each, max 20 points)
+        300 + // Movement patterns
+        (journeyStats.questCompletionTimes.length * 40) + // Quest timeline
+        200   // Geographic coverage
+      )
+    : 0;
+
+  // Location research tokens (from campaign data)
+  const researchTokens = campaign?.locationResearch
+    ? campaign.locationResearch.reduce((sum, r) => sum + r.estimatedTokens, 0)
+    : 0;
+
+  // Campaign reasoning tokens (from campaign data)
+  const reasoningTokens = campaign?.generationReasoning
+    ? campaign.generationReasoning.estimatedTokens
+    : 0;
+
+  // Calculate base text tokens (total minus structured components)
+  const structuredTokens = imageTokens + journeyTokens + researchTokens + reasoningTokens;
+  const baseTextTokens = Math.max(0, Math.ceil(contextPrompt.length / 4) - structuredTokens);
+
+  return {
+    total: baseTextTokens + imageTokens + journeyTokens + researchTokens + reasoningTokens,
+    baseText: baseTextTokens,
+    images: imageTokens,
+    journey: journeyTokens,
+    research: researchTokens,
+    reasoning: reasoningTokens
+  };
+}
+
+/**
  * Build a brief context hint for verification prompts (lighter weight)
  */
-export function buildVerificationContextHint(ctx: SessionContext): string {
+export function buildVerificationContextHint(ctx: SessionContext, campaign?: Campaign): string {
   if (ctx.questHistory.length === 0) {
     return '';
   }

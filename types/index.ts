@@ -100,6 +100,25 @@ export interface Quest {
   placeId?: string;               // Google Places API ID for tracking visited places
 }
 
+// Location research data for context window
+export interface LocationResearch {
+  placeName: string;
+  historicalSignificance: string;
+  architecturalDetails: string;
+  culturalContext: string;
+  mediaTips: string;
+  estimatedTokens: number;
+}
+
+// Campaign generation reasoning for context window
+export interface CampaignReasoning {
+  locationSelection: string[];        // Why each location was chosen
+  difficultyProgression: string;     // Overall difficulty strategy
+  mediaTypeChoices: string[];        // Why each quest uses its media type
+  criteriaDesign: string[];          // Reasoning for each quest's criteria
+  estimatedTokens: number;           // Track contribution to context window
+}
+
 export interface Campaign {
   id: string;
   location: string;
@@ -117,6 +136,10 @@ export interface Campaign {
   enableVideoQuests?: boolean;    // Whether video quests were enabled at creation
   enableAudioQuests?: boolean;    // Whether audio quests were enabled at creation
   guaranteedMix?: boolean;        // Whether guaranteed mix (1 photo, 1 video, 1 audio) was enabled
+
+  // Gemini 3 Context Window Features
+  locationResearch?: LocationResearch[];  // Rich location background for context
+  generationReasoning?: CampaignReasoning;  // AI's reasoning for campaign design
 }
 
 // Campaign generation options

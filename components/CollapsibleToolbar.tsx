@@ -5,8 +5,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { LayoutGrid, X, BookOpen, Settings } from 'lucide-react';
 import XPHeader from './XPHeader';
 import SettingsModal from './SettingsModal';
+import ContextWindowIndicator from './ContextWindowIndicator';
 import { Campaign } from '@/types';
 import { UnitSystem } from '@/lib/units';
+
+interface TokenBreakdown {
+  total: number;
+  baseText: number;
+  images: number;
+  journey: number;
+  research: number;
+  reasoning: number;
+}
 
 interface CollapsibleToolbarProps {
   campaign: Campaign | null;
@@ -14,6 +24,9 @@ interface CollapsibleToolbarProps {
   onOpenQuestBook: () => void;
   unitSystem: UnitSystem;
   onToggleUnit: () => void;
+  contextTokenCount?: number;
+  questHistoryCount?: number;
+  contextTokenBreakdown?: TokenBreakdown;
 }
 
 export default function CollapsibleToolbar({
@@ -22,6 +35,9 @@ export default function CollapsibleToolbar({
   onOpenQuestBook,
   unitSystem,
   onToggleUnit,
+  contextTokenCount = 0,
+  questHistoryCount = 0,
+  contextTokenBreakdown,
 }: CollapsibleToolbarProps) {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -104,14 +120,30 @@ export default function CollapsibleToolbar({
             animate={{ opacity: 1, width: 'auto' }}
             exit={{ opacity: 0, width: 40 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="flex items-center gap-2 bg-black/90 rounded-full border border-adventure-gold/30 shadow-lg px-2 py-1"
+            className="flex items-center gap-2 bg-black/95 rounded-full shadow-lg px-2 py-1"
           >
+            {/* Context Window Indicator - Gemini 3 Feature Showcase */}
+            {campaign && questHistoryCount > 0 && (
+              <motion.div
+                initial={{ opacity: 0, scale: 0.5 }}
+                animate={{ opacity: 1, scale: 1 }}
+                transition={{ delay: 0.05 }}
+                onClick={resetAutoCollapseTimer}
+              >
+                <ContextWindowIndicator
+                  tokenCount={contextTokenCount}
+                  questCount={questHistoryCount}
+                  breakdown={contextTokenBreakdown}
+                />
+              </motion.div>
+            )}
+
             {/* XP Circle - only show when campaign active */}
             {campaign && (
               <motion.div
                 initial={{ opacity: 0, scale: 0.5 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.05 }}
+                transition={{ delay: questHistoryCount > 0 ? 0.1 : 0.05 }}
                 onClick={resetAutoCollapseTimer}
               >
                 <XPHeader onXPGain={onXPGain} />
@@ -123,7 +155,7 @@ export default function CollapsibleToolbar({
               <motion.button
                 initial={{ opacity: 0, scale: 0.5 }}
                 animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.1 }}
+                transition={{ delay: questHistoryCount > 0 ? 0.15 : 0.1 }}
                 onClick={handleQuestBookClick}
                 className="w-10 h-10 bg-black rounded-full border border-white/20 hover:border-white/40 transition-colors flex items-center justify-center"
                 aria-label="Open Quest Book"
@@ -136,7 +168,7 @@ export default function CollapsibleToolbar({
             <motion.button
               initial={{ opacity: 0, scale: 0.5 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: campaign ? 0.15 : 0.05 }}
+              transition={{ delay: campaign ? (questHistoryCount > 0 ? 0.2 : 0.15) : 0.05 }}
               onClick={() => {
                 resetAutoCollapseTimer();
                 setShowSettings(true);
@@ -151,7 +183,7 @@ export default function CollapsibleToolbar({
             <motion.button
               initial={{ opacity: 0, scale: 0.5 }}
               animate={{ opacity: 1, scale: 1 }}
-              transition={{ delay: campaign ? 0.2 : 0.1 }}
+              transition={{ delay: campaign ? (questHistoryCount > 0 ? 0.25 : 0.2) : 0.1 }}
               onClick={handleToggle}
               className="w-8 h-8 rounded-full hover:bg-white/10 transition-colors flex items-center justify-center"
               aria-label="Collapse toolbar"

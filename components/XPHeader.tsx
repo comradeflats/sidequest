@@ -104,14 +104,14 @@ export default function XPHeader({ onXPGain }: XPHeaderProps) {
         onClick={() => setShowLevel(!showLevel)}
         aria-label={showLevel ? 'Show XP' : 'Show Level'}
       >
-        {/* XP Gain Animation - Floats to the right of circle */}
+        {/* XP Gain Animation - Floats above circle */}
         <AnimatePresence>
           {showXPGain && (
             <motion.div
-              initial={{ opacity: 0, x: 0 }}
-              animate={{ opacity: 1, x: 10 }}
-              exit={{ opacity: 0, x: 20 }}
-              className="absolute top-1/2 -translate-y-1/2 left-full ml-2 text-adventure-emerald font-bold text-sm whitespace-nowrap z-10"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 text-adventure-emerald font-bold text-sm whitespace-nowrap z-50 pointer-events-none"
             >
               +{gainAmount} XP
             </motion.div>

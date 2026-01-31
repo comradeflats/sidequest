@@ -2,11 +2,11 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { MapPin, Compass, Zap, CheckCircle, XCircle, Camera, Video, Mic, Navigation, MessageSquare, ExternalLink, RefreshCw } from 'lucide-react';
+import { MapPin, Compass, Zap, CheckCircle, XCircle, Camera, Video, Mic, Navigation, MessageSquare, ExternalLink, RefreshCw, Info } from 'lucide-react';
 import { generateCampaign, verifyMedia, verifyMediaWithAppeal } from '@/lib/game-logic';
 import { geocodeLocation } from '@/lib/location';
 import { generateQuestImage, generateQuestImageWithDetails } from '@/lib/gemini';
-import { Campaign, VerificationResult, DistanceRange, LocationData, Coordinates, AppealData, MediaCaptureData, XP_REWARDS, XP_DISTANCE_BONUS_PER_KM, getStreakBonus, QuestType, CampaignOptions, StoredCampaign } from '@/types';
+import { Campaign, VerificationResult, DistanceRange, LocationData, Coordinates, AppealData, MediaCaptureData, XP_REWARDS, XP_DISTANCE_BONUS_PER_KM, getStreakBonus, QuestType, CampaignOptions, StoredCampaign, LocationResearch } from '@/types';
 import { trackEvent } from '@/lib/analytics';
 import MediaScanner from '@/components/MediaScanner';
 import DistanceRangeSelector from '@/components/DistanceRangeSelector';
@@ -21,6 +21,7 @@ import QuestPreview from '@/components/QuestPreview';
 import ThinkingPanel from '@/components/ThinkingPanel';
 import CollapsibleToolbar from '@/components/CollapsibleToolbar';
 import ImageGenerationError, { ImageErrorDetails } from '@/components/ImageGenerationError';
+import LocationInfoModal from '@/components/LocationInfoModal';
 import {
   getCurrentCampaignId,
   loadCampaign,
@@ -88,6 +89,9 @@ export default function Home() {
   // XP State
   const [xpGain, setXpGain] = useState<{ amount: number; timestamp: number } | null>(null);
 
+  // Location Info Modal State
+  const [showLocationInfo, setShowLocationInfo] = useState(false);
+
   // Ref for auto-scrolling to loading area on setup page
   const loadingRef = useRef<HTMLDivElement>(null);
 
@@ -120,9 +124,13 @@ export default function Home() {
     recordAttempt: recordSessionAttempt,
     startAttempt: startSessionAttempt,
     getVerificationHint,
+    getContextTokenCount,
+    getTokenBreakdown,
     resetContext: resetSessionContext
   } = useSessionContext({
     campaignId: campaign?.id || null,
+    campaign: campaign,  // Pass full campaign for location research
+    journeyStats: journeyStats,  // Pass journey stats for analytics
     enabled: !!campaign
   });
 
@@ -604,7 +612,8 @@ export default function Home() {
         success: verification.success,
         feedback: verification.feedback,
         thinkingSteps: verification.thinking,
-        distanceFromTarget: verification.distanceFromTarget
+        distanceFromTarget: verification.distanceFromTarget,
+        questImageUrl: currentQuest.imageUrl  // Include quest image for context
       });
 
       // Track verification result
@@ -681,7 +690,8 @@ export default function Home() {
         questType: currentQuest.questType || 'PHOTO',
         success: appealResult.success,
         feedback: appealResult.feedback,
-        distanceFromTarget: result?.distanceFromTarget
+        distanceFromTarget: result?.distanceFromTarget,
+        questImageUrl: currentQuest.imageUrl  // Include quest image for context
       });
 
       // Track appeal result
@@ -806,17 +816,33 @@ export default function Home() {
     }
   };
 
+  // Find location research for current quest
+  const getCurrentLocationResearch = (): LocationResearch | null => {
+    if (!campaign || !campaign.locationResearch) return null;
+
+    const currentQuest = campaign.quests[campaign.currentQuestIndex];
+    if (!currentQuest.placeName) return null;
+
+    // Match by placeName
+    return campaign.locationResearch.find(
+      research => research.placeName === currentQuest.placeName
+    ) || null;
+  };
+
   return (
     <main className="min-h-screen bg-black text-emerald-400 p-6 selection:bg-emerald-900 selection:text-emerald-100">
       {/* Unified Header Bar */}
       <div className="fixed top-0 left-0 right-0 z-40 px-4 py-3">
-        <div className="flex items-center justify-end max-w-md mx-auto">
+        <div className="flex items-center justify-end max-w-md mx-auto relative">
           <CollapsibleToolbar
             campaign={campaign}
             onXPGain={xpGain}
             onOpenQuestBook={() => setShowQuestBook(true)}
             unitSystem={unitSystem}
             onToggleUnit={toggleUnit}
+            contextTokenCount={getContextTokenCount()}
+            questHistoryCount={sessionContext?.questHistory.length || 0}
+            contextTokenBreakdown={getTokenBreakdown()}
           />
         </div>
       </div>
@@ -1046,6 +1072,7 @@ export default function Home() {
                     message={isResuming ? "RESTORING YOUR ADVENTURE..." : "GENERATING YOUR ADVENTURE..."}
                     subMessage={isResuming ? "Loading your saved progress" : "Creating quests with Gemini 3"}
                     rotatingMessages={isResuming ? RESUME_MESSAGES : GENERATE_MESSAGES}
+                    hint={!isResuming && !imageProgress ? "This can take 1-2 minutes - feel free to switch tabs!" : undefined}
                     progress={
                       imageProgress
                         ? Math.round((imageProgress.current / imageProgress.total) * 100)
@@ -1214,9 +1241,19 @@ export default function Home() {
                       {/* Quest Title */}
                       <div className="flex items-start gap-3">
                         <Compass className="w-6 h-6 text-adventure-gold flex-shrink-0 mt-1" />
-                        <h2 className="text-xl font-pixel text-adventure-gold leading-tight" style={{ fontSize: '1rem' }}>
+                        <h2 className="text-xl font-pixel text-adventure-gold leading-tight flex-1" style={{ fontSize: '1rem' }}>
                           {currentQuest.title}
                         </h2>
+                        {/* Location Info Button */}
+                        {getCurrentLocationResearch() && (
+                          <button
+                            onClick={() => setShowLocationInfo(true)}
+                            className="text-adventure-sky hover:text-white transition-colors flex-shrink-0"
+                            aria-label="View location information"
+                          >
+                            <Info className="w-5 h-5" />
+                          </button>
+                        )}
                       </div>
 
                       {/* Narrative */}
@@ -1460,6 +1497,15 @@ export default function Home() {
                 setCompletedQuests([]);
               }
             }}
+          />
+        )}
+
+        {/* Location Info Modal */}
+        {campaign && (
+          <LocationInfoModal
+            locationResearch={getCurrentLocationResearch()}
+            isOpen={showLocationInfo}
+            onClose={() => setShowLocationInfo(false)}
           />
         )}
 

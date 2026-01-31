@@ -26,6 +26,7 @@ interface LoadingProgressProps {
   subMessage?: string;
   rotatingMessages?: string[]; // Optional array of messages to rotate through
   progressText?: string; // Optional progress text like "Generating images... (2/3)"
+  hint?: string; // Optional small hint text below rotating messages
 }
 
 const LOGO_ICONS = [MapPin, Compass, Zap, Map, Sparkles];
@@ -35,7 +36,8 @@ export default function LoadingProgress({
   progress,
   subMessage,
   rotatingMessages,
-  progressText
+  progressText,
+  hint
 }: LoadingProgressProps) {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [iconIndex, setIconIndex] = useState(0);
@@ -107,16 +109,25 @@ export default function LoadingProgress({
       </motion.div>
 
       {/* Loading message with fade transition */}
-      <motion.p
-        key={displayMessage}
-        initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: -10 }}
-        transition={{ duration: 0.3 }}
-        className="text-lg font-pixel text-adventure-gold text-center min-h-[2rem]"
-      >
-        {displayMessage}
-      </motion.p>
+      <div className="flex flex-col items-center gap-2">
+        <motion.p
+          key={displayMessage}
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
+          transition={{ duration: 0.3 }}
+          className="text-lg font-pixel text-adventure-gold text-center min-h-[2rem]"
+        >
+          {displayMessage}
+        </motion.p>
+
+        {/* Hint text below rotating messages */}
+        {hint && (
+          <p className="text-xs text-gray-500 font-sans text-center">
+            {hint}
+          </p>
+        )}
+      </div>
 
       {/* Progress bar */}
       <div className="w-full max-w-md h-3 bg-zinc-900 rounded-full overflow-hidden border-2 border-adventure-gold/30">

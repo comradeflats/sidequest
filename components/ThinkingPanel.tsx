@@ -88,9 +88,26 @@ export default function ThinkingPanel({
             <div className="mt-2 bg-zinc-900 border border-zinc-700 rounded-lg overflow-hidden">
               {/* Header */}
               <div className="px-4 py-3 bg-zinc-800/50 border-b border-zinc-700">
-                <div className="flex items-center gap-2">
-                  <Brain className="w-4 h-4 text-adventure-sky" />
-                  <span className="text-xs font-pixel text-adventure-sky">AI REASONING</span>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <Brain className="w-4 h-4 text-adventure-sky" />
+                    <span className="text-xs font-pixel text-adventure-sky">AI REASONING</span>
+                  </div>
+                  <motion.div
+                    initial={{ scale: 0.9, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ duration: 0.3, delay: 0.2 }}
+                    className="flex items-center gap-1.5 px-2 py-1 bg-adventure-emerald/10 border border-adventure-emerald/30 rounded"
+                  >
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 3, repeat: Infinity, ease: "linear" }}
+                      className="w-2 h-2 rounded-full bg-adventure-emerald"
+                    />
+                    <span className="text-[10px] font-sans text-adventure-emerald font-medium">
+                      Extended Reasoning
+                    </span>
+                  </motion.div>
                 </div>
               </div>
 

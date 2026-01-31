@@ -23,7 +23,7 @@ export default function JourneyMap({
   const generateGoogleMapsUrl = () => {
     if (quests.length === 0) return '';
 
-    // Use quest locations to build the map, since those are the actual destinations
+    // Find quests with coordinates (but preserve original indices)
     const questsWithCoords = quests.filter(q => q.coordinates);
 
     if (questsWithCoords.length === 0) return '';
@@ -35,37 +35,49 @@ export default function JourneyMap({
     }
 
     // Multiple quests - show as multi-stop route
-    const firstQuest = questsWithCoords[0];
-    const lastQuest = questsWithCoords[questsWithCoords.length - 1];
+    const firstQuestWithCoords = questsWithCoords[0];
+    const lastQuestWithCoords = questsWithCoords[questsWithCoords.length - 1];
 
     // Use campaignStartLocation if available, otherwise use first quest
     const origin = campaignStartLocation
       ? encodeURIComponent(campaignStartLocation)
-      : `${firstQuest.coordinates!.lat},${firstQuest.coordinates!.lng}`;
+      : `${firstQuestWithCoords.coordinates!.lat},${firstQuestWithCoords.coordinates!.lng}`;
 
-    const destination = `${lastQuest.coordinates!.lat},${lastQuest.coordinates!.lng}`;
+    const destination = `${lastQuestWithCoords.coordinates!.lat},${lastQuestWithCoords.coordinates!.lng}`;
 
     let url = `https://www.google.com/maps/dir/?api=1&origin=${origin}&destination=${destination}&travelmode=walking`;
 
-    // Add waypoints - include all quests except the destination
+    // Build waypoints from the ORIGINAL quest array, filtering only during coordinate extraction
+    const waypointCoords: string[] = [];
+
     if (campaignStartLocation) {
-      // When we have a start location, all quests except the last are waypoints
-      const waypointQuests = questsWithCoords.slice(0, -1);
-      if (waypointQuests.length > 0) {
-        const waypoints = waypointQuests
-          .map(q => `${q.coordinates!.lat},${q.coordinates!.lng}`)
-          .join('|');
-        url += `&waypoints=${waypoints}`;
+      // When we have a start location, all quests (except the last with coords) are waypoints
+      for (let i = 0; i < quests.length; i++) {
+        const quest = quests[i];
+        // Skip quests without coordinates
+        if (!quest.coordinates) continue;
+        // Skip the last quest with coordinates (it's the destination)
+        if (quest.id === lastQuestWithCoords.id) continue;
+
+        waypointCoords.push(`${quest.coordinates.lat},${quest.coordinates.lng}`);
       }
     } else {
       // When first quest is origin, middle quests are waypoints
-      if (questsWithCoords.length > 2) {
-        const middleQuests = questsWithCoords.slice(1, -1);
-        const waypoints = middleQuests
-          .map(q => `${q.coordinates!.lat},${q.coordinates!.lng}`)
-          .join('|');
-        url += `&waypoints=${waypoints}`;
+      for (let i = 0; i < quests.length; i++) {
+        const quest = quests[i];
+        // Skip quests without coordinates
+        if (!quest.coordinates) continue;
+        // Skip the first quest with coordinates (it's the origin)
+        if (quest.id === firstQuestWithCoords.id) continue;
+        // Skip the last quest with coordinates (it's the destination)
+        if (quest.id === lastQuestWithCoords.id) continue;
+
+        waypointCoords.push(`${quest.coordinates.lat},${quest.coordinates.lng}`);
       }
+    }
+
+    if (waypointCoords.length > 0) {
+      url += `&waypoints=${waypointCoords.join('|')}`;
     }
 
     return url;

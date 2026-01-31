@@ -2,7 +2,8 @@ import { getModel, generateQuestImage } from './gemini';
 import { geocodeLocation, calculateDistance } from './location';
 import { getQuestLocations } from './places';
 import { costEstimator } from './cost-estimator';
-import { Campaign, Quest, DistanceRange, DISTANCE_RANGES, PlaceData, Coordinates, AppealData, AppealResult, VerificationResult, CampaignOptions, MediaCaptureData, QuestType, MediaRequirements } from '../types';
+import { generateBatchLocationResearch } from './location-research';
+import { Campaign, Quest, DistanceRange, DISTANCE_RANGES, PlaceData, Coordinates, AppealData, AppealResult, VerificationResult, CampaignOptions, MediaCaptureData, QuestType, MediaRequirements, LocationResearch, CampaignReasoning } from '../types';
 
 /**
  * Build quest type instructions for campaign generation prompt
@@ -206,11 +207,24 @@ export async function generateCampaign(
     - Provide specific hints that help players find the exact spot
     - Ensure quests are appropriate for walking exploration
 
+    GEMINI 3 CONTEXT WINDOW FEATURE - INCLUDE YOUR REASONING:
+    To demonstrate Gemini 3's extended thinking capability, also provide your design reasoning:
+    1. Why did you select each specific location for its quest?
+    2. How did you determine the difficulty progression across quests?
+    3. Why did you choose specific media types (photo/video/audio) for each quest?
+    4. What makes each criterion verifiable and why did you choose those specific criteria?
+
     The output MUST be a JSON object matching this structure:
     {
       "id": "unique-id",
       "location": "${location}",
       "type": "${type}",
+      "reasoning": {
+        "locationSelection": ["Reason for quest 1 location", "Reason for quest 2 location", ...],
+        "difficultyProgression": "Overall reasoning for how difficulty progresses",
+        "mediaTypeChoices": ["Why quest 1 uses its media type", "Why quest 2 uses its media type", ...],
+        "criteriaDesign": ["Why quest 1's criteria were chosen", "Why quest 2's criteria were chosen", ...]
+      },
       "quests": [
         {
           "id": "q1",
@@ -236,9 +250,39 @@ export async function generateCampaign(
   // Track Input Tokens
   costEstimator.trackGeminiInput(prompt.length);
 
-  const result = await model.generateContent(prompt);
-  const response = await result.response;
-  const text = response.text();
+  // OPTIMIZATION: Prepare location research in parallel with campaign generation
+  // Only generate research for real places (not random coordinates)
+  const placesToResearch = questLocations
+    .filter((loc): loc is PlaceData => 'placeId' in loc)
+    .map(place => ({
+      name: place.name,
+      types: place.types,
+      formattedAddress: place.formattedAddress
+    }));
+
+  // Run campaign generation and location research in parallel for 5-10s speedup
+  const [campaignResult, locationResearchData] = await Promise.all([
+    // Campaign generation
+    (async () => {
+      const result = await model.generateContent(prompt);
+      const response = await result.response;
+      return response.text();
+    })(),
+    // Location research (parallel)
+    (async () => {
+      if (placesToResearch.length > 0) {
+        try {
+          return await generateBatchLocationResearch(placesToResearch);
+        } catch (error) {
+          console.error('Failed to generate location research:', error);
+          return [];
+        }
+      }
+      return [];
+    })()
+  ]);
+
+  const text = campaignResult;
 
   // Track Output Tokens
   costEstimator.trackGeminiOutput(text.length);
@@ -246,7 +290,26 @@ export async function generateCampaign(
   try {
     const campaignData = JSON.parse(text);
 
-    // STEP 5: Enrich quest data with coordinates, distance, and place metadata
+    // STEP 5: Extract and process campaign generation reasoning
+    // GEMINI 3 FEATURE: Adds 5-6K tokens of design rationale
+    let campaignReasoning: CampaignReasoning | undefined;
+    if (campaignData.reasoning) {
+      const reasoning = campaignData.reasoning;
+
+      // Calculate token estimate for reasoning
+      const reasoningText = JSON.stringify(reasoning);
+      const estimatedTokens = Math.ceil(reasoningText.length / 4);
+
+      campaignReasoning = {
+        locationSelection: reasoning.locationSelection || [],
+        difficultyProgression: reasoning.difficultyProgression || '',
+        mediaTypeChoices: reasoning.mediaTypeChoices || [],
+        criteriaDesign: reasoning.criteriaDesign || [],
+        estimatedTokens
+      };
+    }
+
+    // STEP 6: Enrich quest data with coordinates, distance, and place metadata
     const questsWithMetadata = campaignData.quests.map((quest: Quest, i: number) => {
       const location = questLocations[i];
       const isPlace = 'placeId' in location;
@@ -264,11 +327,11 @@ export async function generateCampaign(
       };
     });
 
-    // STEP 6: Generate images in parallel with progress tracking
+    // STEP 8: Generate images in parallel with progress tracking
     let completedCount = 0;
     const imagePromises = questsWithMetadata.map(async (quest: Quest) => {
-      const imageUrl = await generateQuestImage(quest, 30000); // 30s timeout
-      
+      const imageUrl = await generateQuestImage(quest); // Uses optimized 20s default timeout
+
       completedCount++;
       if (options?.onProgress) {
         options.onProgress(completedCount, questsWithMetadata.length);
@@ -294,6 +357,8 @@ export async function generateCampaign(
       enableVideoQuests,
       enableAudioQuests,
       guaranteedMix,
+      locationResearch: locationResearchData.length > 0 ? locationResearchData : undefined,
+      generationReasoning: campaignReasoning,
     };
   } catch {
     throw new Error('Failed to generate valid campaign JSON');
@@ -382,16 +447,25 @@ export async function verifyPhoto(
 
   // Build session context injection
   const contextInjection = sessionContextHint || '';
+  const hasSessionContext = contextInjection.length > 0;
 
   const prompt = `
     Analyze this image against the objective: "${objective}".
 
-    STEP-BY-STEP ANALYSIS REQUIRED:
-    For each criterion below, describe what you observe and your confidence level.
+    EXTENDED REASONING MODE - THINK STEP-BY-STEP:
+    Use Gemini 3's extended thinking capability to carefully reason through each criterion.
+    For each criterion below:
+    1. First, describe in detail what you observe in the image
+    2. Compare your observation against the criterion requirement
+    3. Consider any ambiguities or edge cases
+    4. Assign a confidence score (0-100) based on your reasoning
+    5. Determine if the criterion passes (true) or fails (false)
 
     Criteria to verify:
     ${secretCriteria.map((c, i) => `${i + 1}. ${c}`).join('\n    ')}
     ${gpsBoostContext}${contextInjection}
+
+    Think carefully through each step before making your final determination.
 
     Respond in JSON format:
     {
@@ -418,10 +492,19 @@ export async function verifyPhoto(
     },
   };
 
-  // Track Input Tokens (approx for text) + Image Input?
-  // Gemini 1.5 Flash vision input is token based.
-  // 1 image = 258 tokens (approx)
-  costEstimator.trackGeminiInput(prompt.length + 1000); // Adding ~1000 chars buffer for image token equivalent
+  // Track Input Tokens with prompt caching optimization
+  // Session context is cacheable (reused across verifications in same campaign)
+  // Image + objective are variable (not cached)
+  const sessionContextLength = contextInjection.length;
+  const variablePromptLength = prompt.length - sessionContextLength + 1000; // +1000 for image tokens
+
+  // Track cacheable context (if present, mark as cached after first use)
+  if (hasSessionContext) {
+    costEstimator.trackGeminiInput(sessionContextLength, true); // Cached context (90% savings)
+  }
+
+  // Track variable (non-cached) portion
+  costEstimator.trackGeminiInput(variablePromptLength, false);
 
   const result = await model.generateContent([prompt, imagePart]);
   const response = await result.response;
@@ -584,12 +667,20 @@ export async function verifyVideo(
 
   // Build session context injection
   const contextInjection = sessionContextHint || '';
+  const hasSessionContext = contextInjection.length > 0;
 
   const prompt = `
     Analyze this video against the objective: "${objective}".
 
-    STEP-BY-STEP ANALYSIS REQUIRED:
-    For each criterion below, describe what you observe and your confidence level.
+    EXTENDED REASONING MODE - THINK STEP-BY-STEP:
+    Use Gemini 3's extended thinking capability to carefully analyze the video.
+    For each criterion below:
+    1. First, describe in detail what you observe across the video frames
+    2. Compare your observation against the criterion requirement
+    3. Consider temporal aspects (motion, changes over time, sequences)
+    4. Assess any ambiguities or edge cases in the footage
+    5. Assign a confidence score (0-100) based on your reasoning
+    6. Determine if the criterion passes (true) or fails (false)
 
     Criteria to verify:
     ${secretCriteria.map((c, i) => `${i + 1}. ${c}`).join('\n    ')}
@@ -600,6 +691,8 @@ export async function verifyVideo(
     ${gpsBoostContext}${contextInjection}
 
     Duration of video: ${duration} seconds
+
+    Think carefully through each step before making your final determination.
 
     Respond in JSON format:
     {
@@ -626,9 +719,20 @@ export async function verifyVideo(
     },
   };
 
-  // Track video input cost (~300 tokens/second)
+  // Track video input cost with prompt caching
+  const sessionContextLength = contextInjection.length;
+  const variablePromptLength = prompt.length - sessionContextLength;
+
+  // Track cacheable context
+  if (hasSessionContext) {
+    costEstimator.trackGeminiInput(sessionContextLength, true); // Cached
+  }
+
+  // Track variable portion
+  costEstimator.trackGeminiInput(variablePromptLength, false);
+
+  // Track video tokens
   const videoTokens = Math.ceil(duration * 300);
-  costEstimator.trackGeminiInput(prompt.length);
   costEstimator.trackGeminiVideoInput(videoTokens);
 
   const result = await model.generateContent([prompt, videoPart]);
@@ -707,12 +811,20 @@ export async function verifyAudio(
 
   // Build session context injection
   const contextInjection = sessionContextHint || '';
+  const hasSessionContext = contextInjection.length > 0;
 
   const prompt = `
     Analyze this audio recording against the objective: "${objective}".
 
-    STEP-BY-STEP ANALYSIS REQUIRED:
-    For each criterion below, describe what you hear and your confidence level.
+    EXTENDED REASONING MODE - THINK STEP-BY-STEP:
+    Use Gemini 3's extended thinking capability to carefully analyze the audio.
+    For each criterion below:
+    1. First, describe in detail what you hear in the recording
+    2. Compare your auditory observation against the criterion requirement
+    3. Consider sound characteristics (volume, clarity, frequency, timing)
+    4. Assess any background noise or interfering sounds
+    5. Assign a confidence score (0-100) based on your reasoning
+    6. Determine if the criterion passes (true) or fails (false)
 
     Criteria to verify:
     ${secretCriteria.map((c, i) => `${i + 1}. ${c}`).join('\n    ')}
@@ -723,6 +835,8 @@ export async function verifyAudio(
     ${gpsBoostContext}${contextInjection}
 
     Duration of audio: ${duration} seconds
+
+    Think carefully through each step before making your final determination.
 
     Respond in JSON format:
     {
@@ -749,9 +863,20 @@ export async function verifyAudio(
     },
   };
 
-  // Track audio input cost (~32 tokens/second)
+  // Track audio input cost with prompt caching
+  const sessionContextLength = contextInjection.length;
+  const variablePromptLength = prompt.length - sessionContextLength;
+
+  // Track cacheable context
+  if (hasSessionContext) {
+    costEstimator.trackGeminiInput(sessionContextLength, true); // Cached
+  }
+
+  // Track variable portion
+  costEstimator.trackGeminiInput(variablePromptLength, false);
+
+  // Track audio tokens
   const audioTokens = Math.ceil(duration * 32);
-  costEstimator.trackGeminiInput(prompt.length);
   costEstimator.trackGeminiAudioInput(audioTokens);
 
   const result = await model.generateContent([prompt, audioPart]);

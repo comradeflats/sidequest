@@ -152,13 +152,13 @@ export default function AppealDialog({
           <button
             onClick={handleSubmit}
             disabled={!explanation.trim() || isSubmitting}
-            className="flex-1 bg-adventure-emerald text-black font-pixel py-3 rounded-lg hover:bg-adventure-gold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 bg-adventure-emerald text-black font-pixel py-3 rounded-lg hover:bg-adventure-gold transition-colors flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed min-w-0"
             style={{ fontSize: '0.85rem' }}
           >
             {isSubmitting ? (
               <>
-                <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin" />
-                SUBMITTING...
+                <div className="w-4 h-4 border-2 border-black border-t-transparent rounded-full animate-spin flex-shrink-0" />
+                <span className="truncate">SUBMITTING...</span>
               </>
             ) : (
               <>
