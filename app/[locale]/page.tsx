@@ -830,7 +830,7 @@ export default function Home() {
   };
 
   return (
-    <main className="min-h-screen bg-black text-emerald-400 p-6 selection:bg-emerald-900 selection:text-emerald-100">
+    <main className="min-h-screen bg-black text-emerald-400 px-4 sm:px-6 py-6 overflow-x-hidden selection:bg-emerald-900 selection:text-emerald-100">
       {/* Unified Header Bar */}
       <div className="fixed top-0 left-0 right-0 z-40 px-4 py-3">
         <div className="flex items-center justify-end max-w-md mx-auto relative">

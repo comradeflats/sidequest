@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Sparkles } from 'lucide-react';
 import { PlayerProgress, LEVEL_THRESHOLDS } from '@/types';
 import { getPlayerProgress, getXPForNextLevel } from '@/lib/storage';
 
@@ -26,7 +25,6 @@ export default function XPHeader({ onXPGain }: XPHeaderProps) {
   const [xpInfo, setXpInfo] = useState({ current: 0, needed: 100, progress: 0 });
   const [showXPGain, setShowXPGain] = useState(false);
   const [gainAmount, setGainAmount] = useState(0);
-  const [showLevelUp, setShowLevelUp] = useState(false);
   const [previousLevel, setPreviousLevel] = useState(1);
   const [showLevel, setShowLevel] = useState(false); // Toggle between XP and Level display
 
@@ -52,11 +50,8 @@ export default function XPHeader({ onXPGain }: XPHeaderProps) {
         const newProgress = getPlayerProgress();
         const newXpInfo = getXPForNextLevel(newProgress.totalXP);
 
-        // Check for level up
-        if (newProgress.level > previousLevel) {
-          setShowLevelUp(true);
-          setTimeout(() => setShowLevelUp(false), 2500);
-        }
+        // Level up detected - user can see it by clicking XP circle
+        // No banner needed
 
         setProgress(newProgress);
         setXpInfo(newXpInfo);
@@ -80,38 +75,20 @@ export default function XPHeader({ onXPGain }: XPHeaderProps) {
 
   return (
     <div className="relative">
-      {/* Level Up Animation - Shows below for fixed corner position */}
-      <AnimatePresence>
-        {showLevelUp && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.5, y: -20 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.5, y: -20 }}
-            className="absolute top-full left-0 mt-2 bg-adventure-emerald text-black px-4 py-2 rounded-lg font-pixel text-sm whitespace-nowrap shadow-lg z-50"
-          >
-            <div className="flex items-center gap-2">
-              <Sparkles className="w-4 h-4" />
-              LEVEL {progress.level}!
-              <Sparkles className="w-4 h-4" />
-            </div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* XP Circle - Tappable to toggle between XP and Level */}
       <button
         className="relative cursor-pointer active:scale-95 transition-transform"
         onClick={() => setShowLevel(!showLevel)}
         aria-label={showLevel ? 'Show XP' : 'Show Level'}
       >
-        {/* XP Gain Animation - Floats above circle */}
+        {/* XP Gain Animation - Appears below circle for mobile visibility */}
         <AnimatePresence>
           {showXPGain && (
             <motion.div
-              initial={{ opacity: 0, y: 10 }}
+              initial={{ opacity: 0, y: -10 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -10 }}
-              className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 text-adventure-emerald font-bold text-sm whitespace-nowrap z-50 pointer-events-none"
+              exit={{ opacity: 0, y: 10 }}
+              className="absolute top-full left-1/2 -translate-x-1/2 mt-2 text-adventure-emerald font-bold text-sm whitespace-nowrap z-50 pointer-events-none"
             >
               +{gainAmount} XP
             </motion.div>

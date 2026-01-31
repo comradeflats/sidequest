@@ -120,7 +120,7 @@ export default function CollapsibleToolbar({
             animate={{ opacity: 1, width: 'auto' }}
             exit={{ opacity: 0, width: 40 }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="flex items-center gap-2 bg-black/95 rounded-full shadow-lg px-2 py-1"
+            className="flex items-center gap-2 bg-black/95 rounded-full shadow-lg px-2 py-1 max-w-[calc(100vw-2rem)]"
           >
             {/* Context Window Indicator - Gemini 3 Feature Showcase */}
             {campaign && questHistoryCount > 0 && (

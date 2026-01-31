@@ -5,6 +5,11 @@ import { costEstimator } from "./cost-estimator";
 const API_KEY = process.env.NEXT_PUBLIC_GEMINI_API_KEY || "";
 const genAI = new GoogleGenerativeAI(API_KEY);
 
+// Image generation model configuration
+// NOTE: For Gemini 3 hackathon, only gemini-3-pro-image-preview is available
+// There is no Gemini 3 Flash image model (Flash image is Gemini 2.5)
+// Using Pro with optimized timeouts (30s) and retries (2)
+
 // Model config type
 interface ModelConfig {
   safetySettings: Array<{ category: HarmCategory; threshold: HarmBlockThreshold }>;
@@ -13,7 +18,7 @@ interface ModelConfig {
   };
 }
 
-export const getModel = (type: 'campaign' | 'verification' | 'image' = 'verification') => {
+export const getModel = (type: 'campaign' | 'verification' | 'image' | 'research' = 'verification') => {
   let modelName: string;
   const config: ModelConfig = {
     safetySettings: [
@@ -26,19 +31,26 @@ export const getModel = (type: 'campaign' | 'verification' | 'image' = 'verifica
 
   switch(type) {
     case 'campaign':
-      // Using Pro for campaign generation - showcase Gemini 3's powerful reasoning
+      // GEMINI 3 SHOWCASE: Pro for extended reasoning in campaign design
       modelName = "gemini-3-pro-preview";
       config.generationConfig = { responseMimeType: "application/json" };
       break;
     case 'verification':
-      // Using Pro for verification - best multimodal understanding for photo/video/audio
-      // Extended thinking activated through detailed step-by-step prompts
+      // GEMINI 3 SHOWCASE: Pro for multimodal understanding (photo/video/audio)
+      // Extended thinking through step-by-step prompts
       modelName = "gemini-3-pro-preview";
       config.generationConfig = {
         responseMimeType: "application/json"
       };
       break;
+    case 'research':
+      // OPTIMIZATION: Flash for simple text generation (location research)
+      modelName = "gemini-3-flash-preview";
+      config.generationConfig = { responseMimeType: "application/json" };
+      break;
     case 'image':
+      // GEMINI 3 SHOWCASE: Pro Image for high-quality pixel art generation
+      // Only Gemini 3 image model available (no Flash variant in v3)
       modelName = "gemini-3-pro-image-preview";
       // No JSON config - returns binary image data
       break;
@@ -63,8 +75,8 @@ export interface ImageGenerationResult {
 
 export async function generateQuestImage(
   quest: Quest,
-  timeout: number = 20000,
-  retries: number = 1,
+  timeout: number = 30000, // 30s timeout for Gemini 3 Pro Image
+  retries: number = 2, // 2 retries for reliability
   adaptiveTimeout: boolean = true
 ): Promise<string | null> {
   let lastError: Error | null = null;
@@ -72,11 +84,14 @@ export async function generateQuestImage(
   // Adaptive timeout based on first successful generation
   let effectiveTimeout = timeout;
   if (adaptiveTimeout && firstImageGenerationTime !== null) {
-    if (firstImageGenerationTime < 10000) {
-      // First image was fast, reduce timeout for subsequent images
-      effectiveTimeout = 15000;
+    if (firstImageGenerationTime < 8000) {
+      // First image was very fast (Flash model), reduce timeout slightly
+      effectiveTimeout = 20000;
+    } else if (firstImageGenerationTime < 15000) {
+      // First image was reasonably fast, use moderate timeout
+      effectiveTimeout = 25000;
     }
-    // If first image took 15-20s, keep 20s timeout (default behavior)
+    // If first image took 15-30s, keep 30s timeout (Pro model)
   }
 
   // Try with retry logic
@@ -138,13 +153,17 @@ export async function generateQuestImage(
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown error');
 
+      console.log(`Image generation attempt ${attempt + 1}/${retries + 1} failed:`, lastError.message);
+
       // If it's not a timeout or this is the last attempt, give up
       if (!lastError.message.includes('Timeout') || attempt === retries) {
         break;
       }
 
-      // Wait before retry (exponential backoff starting at 2s)
-      await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
+      // Wait before retry (exponential backoff: 2s, 4s, 6s)
+      const waitTime = 2000 * (attempt + 1);
+      console.log(`Retrying in ${waitTime/1000}s...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     }
   }
 
@@ -159,8 +178,8 @@ export async function generateQuestImage(
  */
 export async function generateQuestImageWithDetails(
   quest: Quest,
-  timeout: number = 20000,
-  retries: number = 1,
+  timeout: number = 30000, // 30s timeout for Gemini 3 Pro Image
+  retries: number = 2, // 2 retries for reliability
   adaptiveTimeout: boolean = true
 ): Promise<ImageGenerationResult> {
   let lastError: Error | null = null;
@@ -168,9 +187,14 @@ export async function generateQuestImageWithDetails(
   // Adaptive timeout based on first successful generation
   let effectiveTimeout = timeout;
   if (adaptiveTimeout && firstImageGenerationTime !== null) {
-    if (firstImageGenerationTime < 10000) {
-      effectiveTimeout = 15000;
+    if (firstImageGenerationTime < 8000) {
+      // First image was very fast (Flash model), reduce timeout slightly
+      effectiveTimeout = 20000;
+    } else if (firstImageGenerationTime < 15000) {
+      // First image was reasonably fast, use moderate timeout
+      effectiveTimeout = 25000;
     }
+    // If first image took 15-30s, keep 30s timeout (Pro model)
   }
 
   const overallStartTime = Date.now();
@@ -232,11 +256,16 @@ export async function generateQuestImageWithDetails(
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown error');
 
+      console.log(`Image generation attempt ${attempt + 1}/${retries + 1} failed:`, lastError.message);
+
       if (!lastError.message.includes('Timeout') || attempt === retries) {
         break;
       }
 
-      await new Promise(resolve => setTimeout(resolve, 2000 * (attempt + 1)));
+      // Wait before retry (exponential backoff: 2s, 4s, 6s)
+      const waitTime = 2000 * (attempt + 1);
+      console.log(`Retrying in ${waitTime/1000}s...`);
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     }
   }
 

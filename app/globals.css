@@ -200,3 +200,19 @@ body {
 
 /* Scanline Effect - REMOVED for warmer aesthetic */
 /* The terminal/CRT look has been replaced with a softer adventure theme */
+
+/* Mobile-safe utilities */
+@media (max-width: 640px) {
+  .mobile-safe-top {
+    padding-top: env(safe-area-inset-top);
+  }
+
+  .mobile-safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .mobile-overflow-safe {
+    max-width: calc(100vw - 2rem);
+    overflow-x: hidden;
+  }
+}

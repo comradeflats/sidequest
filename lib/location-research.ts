@@ -25,7 +25,7 @@ export async function generateLocationResearch(
   placeTypes: string[],
   formattedAddress: string
 ): Promise<LocationResearch> {
-  const model = getModel('campaign');
+  const model = getModel('research');
 
   const prompt = `
     Generate concise background research for this location for a scavenger hunt game.
