@@ -76,23 +76,27 @@ export default function ContextWindowIndicator({
               ease: "easeInOut"
             }}
           >
-            <Brain className="w-3.5 h-3.5 text-purple-400" />
+            <Brain className="w-3 h-3 sm:w-3.5 sm:h-3.5 text-purple-400" />
           </motion.div>
-          <div className="flex flex-col">
+          <div className="hidden sm:flex flex-col">
             <div className="flex items-center gap-1">
               <span className="text-[10px] font-pixel text-purple-300 leading-none">
                 CONTEXT
               </span>
-              <Sparkles className="w-2.5 h-2.5 text-purple-400" />
+              <Sparkles className="w-2 h-2 sm:w-2.5 sm:h-2.5 text-purple-400" />
             </div>
             <span className="text-[9px] font-mono text-purple-400/70 leading-none mt-0.5">
               {formattedTokens} / 1M
             </span>
           </div>
+          {/* Mobile-only compact display */}
+          <span className="text-[9px] font-mono text-purple-400/70 leading-none sm:hidden">
+            {formattedTokens}
+          </span>
         </div>
 
         {/* Progress bar */}
-        <div className="w-16 h-1 bg-purple-900/30 rounded-full overflow-hidden">
+        <div className="w-8 sm:w-16 h-1 bg-purple-900/30 rounded-full overflow-hidden">
           <motion.div
             initial={{ width: 0 }}
             animate={{ width: `${Math.min(percentage, 100)}%` }}
@@ -126,7 +130,7 @@ export default function ContextWindowIndicator({
           animate={{ rotate: isExpanded ? 180 : 0 }}
           transition={{ duration: 0.2 }}
         >
-          <ChevronDown className="w-3 h-3 text-purple-400" />
+          <ChevronDown className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-purple-400" />
         </motion.div>
       </motion.div>
 
