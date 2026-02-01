@@ -31,14 +31,14 @@ export const getModel = (type: 'campaign' | 'verification' | 'image' | 'research
 
   switch(type) {
     case 'campaign':
-      // GEMINI 3 SHOWCASE: Pro for extended reasoning in campaign design
-      modelName = "gemini-3-pro-preview";
+      // GEMINI 3 SHOWCASE: Flash for fast campaign generation with Pro-level intelligence
+      modelName = "gemini-3-flash-preview";
       config.generationConfig = { responseMimeType: "application/json" };
       break;
     case 'verification':
-      // GEMINI 3 SHOWCASE: Pro for multimodal understanding (photo/video/audio)
+      // GEMINI 3 SHOWCASE: Flash for fast multimodal understanding (photo/video/audio)
       // Extended thinking through step-by-step prompts
-      modelName = "gemini-3-pro-preview";
+      modelName = "gemini-3-flash-preview";
       config.generationConfig = {
         responseMimeType: "application/json"
       };

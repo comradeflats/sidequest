@@ -1072,7 +1072,7 @@ export default function Home() {
                     message={isResuming ? "RESTORING YOUR ADVENTURE..." : "GENERATING YOUR ADVENTURE..."}
                     subMessage={isResuming ? "Loading your saved progress" : "Creating quests with Gemini 3"}
                     rotatingMessages={isResuming ? RESUME_MESSAGES : GENERATE_MESSAGES}
-                    hint={!isResuming && !imageProgress ? "This can take 1-2 minutes - feel free to switch tabs!" : undefined}
+                    hint={!isResuming && !imageProgress ? "This can take 1 minute or less - feel free to switch tabs!" : undefined}
                     progress={
                       imageProgress
                         ? Math.round((imageProgress.current / imageProgress.total) * 100)

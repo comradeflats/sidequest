@@ -129,15 +129,22 @@ export async function generateCampaign(
   const guaranteedMix = options?.guaranteedMix || false;
   const questCount = type === 'short' ? 3 : 5;
 
+  const startTime = Date.now();
+  console.log('⏱️ Campaign generation started');
+
   // STEP 1: Geocode the starting location
+  const step1Start = Date.now();
   const locationData = await geocodeLocation(location);
+  console.log(`✅ Step 1 (Geocode): ${Date.now() - step1Start}ms`);
 
   // STEP 2: Get quest locations using Places API (with fallback to random coordinates)
+  const step2Start = Date.now();
   const questLocations = await getQuestLocations(
     locationData.coordinates,
     distanceRange,
     questCount
   );
+  console.log(`✅ Step 2 (Places API): ${Date.now() - step2Start}ms`);
 
   // Extract coordinates from quest locations (whether PlaceData or Coordinates)
   const questCoords: Coordinates[] = questLocations.map((loc) =>
@@ -148,11 +155,13 @@ export async function generateCampaign(
   const startPoint = locationData.coordinates;
   const allPoints = [startPoint, ...questCoords];
 
-  // Parallel distance calculations for faster campaign generation
+  // STEP 3: Parallel distance calculations for faster campaign generation
+  const step3Start = Date.now();
   const distancePromises = questCoords.map((_, i) =>
     calculateDistance(allPoints[i], allPoints[i + 1])
   );
   const distanceResults = await Promise.all(distancePromises);
+  console.log(`✅ Step 3 (Distance calculations): ${Date.now() - step3Start}ms`);
 
   const distances: number[] = distanceResults.map(r => r.distanceKm);
   const durations: number[] = distanceResults.map(r => r.durationMinutes);
@@ -260,7 +269,8 @@ export async function generateCampaign(
       formattedAddress: place.formattedAddress
     }));
 
-  // Run campaign generation and location research in parallel for 5-10s speedup
+  // STEP 4: Run campaign generation and location research in parallel for 5-10s speedup
+  const step4Start = Date.now();
   const [campaignResult, locationResearchData] = await Promise.all([
     // Campaign generation
     (async () => {
@@ -281,6 +291,7 @@ export async function generateCampaign(
       return [];
     })()
   ]);
+  console.log(`✅ Step 4 (Campaign + Research parallel): ${Date.now() - step4Start}ms`);
 
   const text = campaignResult;
 
@@ -328,9 +339,10 @@ export async function generateCampaign(
     });
 
     // STEP 8: Generate images in parallel with progress tracking
+    const step8Start = Date.now();
     let completedCount = 0;
     const imagePromises = questsWithMetadata.map(async (quest: Quest) => {
-      const imageUrl = await generateQuestImage(quest); // Uses optimized 20s default timeout
+      const imageUrl = await generateQuestImage(quest); // Uses optimized 30s default timeout
 
       completedCount++;
       if (options?.onProgress) {
@@ -345,6 +357,8 @@ export async function generateCampaign(
     });
 
     const questsWithImages = await Promise.all(imagePromises);
+    console.log(`✅ Step 8 (Image generation parallel): ${Date.now() - step8Start}ms`);
+    console.log(`🎉 Total campaign generation time: ${Date.now() - startTime}ms`);
 
     return {
       ...campaignData,
