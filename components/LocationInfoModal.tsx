@@ -1,7 +1,7 @@
 'use client';
 
 import { LocationResearch } from '@/types';
-import { X, MapPin, Building, Users, Camera } from 'lucide-react';
+import { X, MapPin, Building, Users, Camera, Info } from 'lucide-react';
 
 interface LocationInfoModalProps {
   locationResearch: LocationResearch | null;
@@ -58,16 +58,16 @@ export default function LocationInfoModal({
             </p>
           </div>
 
-          {/* Architectural Details */}
+          {/* Visitor Tips */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
-              <Building className="w-4 h-4 text-adventure-gold" />
+              <Info className="w-4 h-4 text-adventure-gold" />
               <h4 className="text-xs uppercase text-adventure-gold font-pixel">
-                Architectural Details
+                Visitor Tips
               </h4>
             </div>
             <p className="text-sm font-sans text-gray-300 leading-relaxed">
-              {locationResearch.architecturalDetails}
+              {locationResearch.visitorTips}
             </p>
           </div>
 

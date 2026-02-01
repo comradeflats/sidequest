@@ -104,7 +104,7 @@ export interface Quest {
 export interface LocationResearch {
   placeName: string;
   historicalSignificance: string;
-  architecturalDetails: string;
+  visitorTips: string;          // 75-100 tokens
   culturalContext: string;
   mediaTips: string;
   estimatedTokens: number;
@@ -161,7 +161,16 @@ export interface MediaRequirements {
   minDuration?: number;  // seconds
   maxDuration?: number;  // seconds
   description?: string;  // e.g., "10-30 second video"
+  maxDistanceMeters?: number | null;  // Override default distance threshold (null = disabled)
 }
+
+// GPS distance threshold configuration
+export const GPS_DISTANCE_THRESHOLDS = {
+  DEFAULT: 200,        // 200m default (2-3 city blocks)
+  STRICT: 100,         // 100m for precise locations (landmarks)
+  LENIENT: 500,        // 500m for larger areas (parks)
+  DISABLED: null       // Disable distance checking for specific quests
+};
 
 // Media capture data
 export interface MediaCaptureData {
@@ -189,6 +198,7 @@ export interface VerificationResult {
   // Thinking Levels - Transparent AI reasoning
   thinking?: ThinkingStep[];     // Step-by-step analysis
   overallConfidence?: number;    // 0-100 overall confidence
+  rejectionReason?: 'too_far' | 'duration' | 'content' | 'appeal_rejected';  // Reason for rejection
 }
 
 export interface AppealData {

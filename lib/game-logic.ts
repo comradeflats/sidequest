@@ -3,7 +3,7 @@ import { geocodeLocation, calculateDistance } from './location';
 import { getQuestLocations } from './places';
 import { costEstimator } from './cost-estimator';
 import { generateBatchLocationResearch } from './location-research';
-import { Campaign, Quest, DistanceRange, DISTANCE_RANGES, PlaceData, Coordinates, AppealData, AppealResult, VerificationResult, CampaignOptions, MediaCaptureData, QuestType, MediaRequirements, LocationResearch, CampaignReasoning } from '../types';
+import { Campaign, Quest, DistanceRange, DISTANCE_RANGES, PlaceData, Coordinates, AppealData, AppealResult, VerificationResult, CampaignOptions, MediaCaptureData, QuestType, MediaRequirements, LocationResearch, CampaignReasoning, GPS_DISTANCE_THRESHOLDS } from '../types';
 
 /**
  * Build quest type instructions for campaign generation prompt
@@ -425,6 +425,52 @@ function calculateGpsConfidence(distanceMeters: number | null, accuracyMeters: n
   return Math.max(0, 0.2 * (1 - (effectiveDistance - 100) / 200));
 }
 
+// Helper function to check if user is within acceptable distance threshold
+function checkDistanceThreshold(
+  userGps: Coordinates | null | undefined,
+  targetGps: Coordinates | null | undefined,
+  maxDistanceMeters?: number | null
+): {
+  withinThreshold: boolean;
+  distanceMeters?: number;
+  rejectionMessage?: string;
+} {
+  // If distance checking is disabled (null threshold), always pass
+  if (maxDistanceMeters === null) {
+    return { withinThreshold: true };
+  }
+
+  // If no GPS data available, allow (graceful degradation per user preference)
+  if (!userGps || !targetGps) {
+    return {
+      withinThreshold: true,
+      rejectionMessage: undefined
+    };
+  }
+
+  // Calculate actual distance
+  const { distanceMeters } = calculateStraightLineDistance(userGps, targetGps);
+
+  // Use provided threshold or default (200m)
+  const threshold = maxDistanceMeters ?? GPS_DISTANCE_THRESHOLDS.DEFAULT;
+
+  if (distanceMeters > threshold) {
+    const distanceKm = (distanceMeters / 1000).toFixed(1);
+    const thresholdKm = (threshold / 1000).toFixed(1);
+
+    return {
+      withinThreshold: false,
+      distanceMeters,
+      rejectionMessage: `You're ${distanceKm}km away from the target location. You need to be within ${thresholdKm}km to complete this quest. Head to the quest marker and try again!`
+    };
+  }
+
+  return {
+    withinThreshold: true,
+    distanceMeters
+  };
+}
+
 // Helper function to get GPS confidence label
 function getGpsConfidenceLabel(confidence: number): string {
   if (confidence >= 0.9) return '🎯 (Excellent)';
@@ -441,8 +487,23 @@ export async function verifyPhoto(
   userGps?: Coordinates,
   targetGps?: Coordinates,
   gpsAccuracy?: number,
-  sessionContextHint?: string
+  sessionContextHint?: string,
+  maxDistanceMeters?: number | null
 ): Promise<VerificationResult> {
+  // EARLY DISTANCE CHECK - Before model initialization
+  const distanceCheck = checkDistanceThreshold(userGps, targetGps, maxDistanceMeters);
+
+  if (!distanceCheck.withinThreshold) {
+    return {
+      success: false,
+      feedback: distanceCheck.rejectionMessage!,
+      appealable: false,
+      distanceFromTarget: distanceCheck.distanceMeters,
+      mediaType: 'photo',
+      rejectionReason: 'too_far'
+    };
+  }
+
   const model = getModel('verification'); // Gemini 3 Flash is great for vision speed
 
   // Calculate distance if GPS available
@@ -665,7 +726,8 @@ export async function verifyVideo(
       feedback: `Your video is too short! We need at least ${minDuration} seconds to properly analyze the scene. Try recording a bit longer.`,
       appealable: false,
       distanceFromTarget,
-      mediaType: 'video'
+      mediaType: 'video',
+      rejectionReason: 'duration'
     };
   }
 
@@ -675,7 +737,26 @@ export async function verifyVideo(
       feedback: `Your video is too long! Keep it under ${maxDuration} seconds for better analysis. Sometimes less is more!`,
       appealable: false,
       distanceFromTarget,
-      mediaType: 'video'
+      mediaType: 'video',
+      rejectionReason: 'duration'
+    };
+  }
+
+  // EARLY DISTANCE CHECK - After duration checks
+  const distanceCheckVideo = checkDistanceThreshold(
+    userGps,
+    targetGps,
+    mediaRequirements?.maxDistanceMeters
+  );
+
+  if (!distanceCheckVideo.withinThreshold) {
+    return {
+      success: false,
+      feedback: distanceCheckVideo.rejectionMessage!,
+      appealable: false,
+      distanceFromTarget: distanceCheckVideo.distanceMeters,
+      mediaType: 'video',
+      rejectionReason: 'too_far'
     };
   }
 
@@ -809,7 +890,8 @@ export async function verifyAudio(
       feedback: `Your audio recording is too short! We need at least ${minDuration} seconds to capture the soundscape. Let it roll a bit longer.`,
       appealable: false,
       distanceFromTarget,
-      mediaType: 'audio'
+      mediaType: 'audio',
+      rejectionReason: 'duration'
     };
   }
 
@@ -819,7 +901,26 @@ export async function verifyAudio(
       feedback: `Your audio is too long! Keep it under ${maxDuration} seconds. We just need a snapshot of the sound.`,
       appealable: false,
       distanceFromTarget,
-      mediaType: 'audio'
+      mediaType: 'audio',
+      rejectionReason: 'duration'
+    };
+  }
+
+  // EARLY DISTANCE CHECK - After duration checks
+  const distanceCheckAudio = checkDistanceThreshold(
+    userGps,
+    targetGps,
+    mediaRequirements?.maxDistanceMeters
+  );
+
+  if (!distanceCheckAudio.withinThreshold) {
+    return {
+      success: false,
+      feedback: distanceCheckAudio.rejectionMessage!,
+      appealable: false,
+      distanceFromTarget: distanceCheckAudio.distanceMeters,
+      mediaType: 'audio',
+      rejectionReason: 'too_far'
     };
   }
 
@@ -963,7 +1064,8 @@ export async function verifyMedia(
         userGps,
         targetGps,
         gpsAccuracy,
-        sessionContextHint
+        sessionContextHint,
+        mediaRequirements?.maxDistanceMeters
       );
   }
 }

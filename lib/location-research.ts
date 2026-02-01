@@ -10,7 +10,7 @@ import { Coordinates } from '@/types';
 export interface LocationResearch {
   placeName: string;
   historicalSignificance: string;  // 100-150 tokens
-  architecturalDetails: string;    // 75-100 tokens
+  visitorTips: string;             // 75-100 tokens
   culturalContext: string;         // 75-100 tokens
   mediaTips: string;               // 50-75 tokens
   estimatedTokens: number;         // Track contribution to context window
@@ -41,9 +41,10 @@ export async function generateLocationResearch(
        - When was it built/established and why?
        - Any notable events or people associated with it?
 
-    2. ARCHITECTURAL/DESIGN DETAILS (2-3 sentences):
-       - Describe the architectural style or design features
-       - Notable visual elements or unique characteristics
+    2. VISITOR TIPS (2-3 sentences):
+       - Practical advice for visiting this location
+       - What to expect, bring, or be aware of
+       - General etiquette or behavioral norms if applicable
 
     3. CULTURAL CONTEXT (2-3 sentences):
        - Cultural or social significance to the local community
@@ -58,7 +59,7 @@ export async function generateLocationResearch(
     Respond in JSON format:
     {
       "historicalSignificance": "string",
-      "architecturalDetails": "string",
+      "visitorTips": "string",
       "culturalContext": "string",
       "mediaTips": "string"
     }
@@ -80,7 +81,7 @@ export async function generateLocationResearch(
     // Estimate token contribution (rough: 4 chars per token)
     const estimatedTokens = Math.ceil(
       (parsed.historicalSignificance.length +
-       parsed.architecturalDetails.length +
+       parsed.visitorTips.length +
        parsed.culturalContext.length +
        parsed.mediaTips.length) / 4
     );
@@ -88,7 +89,7 @@ export async function generateLocationResearch(
     return {
       placeName,
       historicalSignificance: parsed.historicalSignificance,
-      architecturalDetails: parsed.architecturalDetails,
+      visitorTips: parsed.visitorTips,
       culturalContext: parsed.culturalContext,
       mediaTips: parsed.mediaTips,
       estimatedTokens
@@ -99,7 +100,7 @@ export async function generateLocationResearch(
     return {
       placeName,
       historicalSignificance: `${placeName} is a notable location in the area.`,
-      architecturalDetails: `This location features distinctive characteristics typical of ${placeTypes[0] || 'the area'}.`,
+      visitorTips: `When visiting ${placeName}, arrive with an open mind and respect local customs.`,
       culturalContext: `${placeName} is an important part of the local community.`,
       mediaTips: 'Look for interesting angles and good lighting when capturing this location.',
       estimatedTokens: 100

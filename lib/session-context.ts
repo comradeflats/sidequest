@@ -382,7 +382,7 @@ Rich background research on quest locations to demonstrate deep contextual under
     for (const research of campaign.locationResearch) {
       prompt += `\n=== ${research.placeName} ===\n\n`;
       prompt += `HISTORICAL SIGNIFICANCE:\n${research.historicalSignificance}\n\n`;
-      prompt += `ARCHITECTURAL DETAILS:\n${research.architecturalDetails}\n\n`;
+      prompt += `VISITOR TIPS:\n${research.visitorTips}\n\n`;
       prompt += `CULTURAL CONTEXT:\n${research.culturalContext}\n\n`;
       prompt += `MEDIA CAPTURE TIPS:\n${research.mediaTips}\n\n`;
     }
