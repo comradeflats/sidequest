@@ -55,7 +55,7 @@ export default function ContextWindowIndicator({
     <motion.div
       initial={{ opacity: 0, scale: 0.9 }}
       animate={{ opacity: 1, scale: 1 }}
-      className="flex flex-col gap-2"
+      className="relative"
     >
       {/* Main indicator bar */}
       <motion.div
@@ -138,7 +138,7 @@ export default function ContextWindowIndicator({
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: -10, scale: 0.95 }}
             transition={{ duration: 0.2 }}
-            className="px-4 py-3 backdrop-blur-md border border-purple-500/20 rounded-xl shadow-2xl"
+            className="absolute top-full left-0 mt-2 min-w-[280px] z-50 px-4 py-3 bg-black/95 backdrop-blur-md border border-purple-500/20 rounded-xl shadow-2xl"
           >
             <div className="flex flex-col gap-2">
               <div className="text-[10px] font-pixel text-purple-300 mb-0.5 uppercase tracking-wider">
