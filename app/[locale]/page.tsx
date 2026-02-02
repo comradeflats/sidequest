@@ -6,6 +6,7 @@ import { MapPin, Compass, Zap, CheckCircle, XCircle, Camera, Video, Mic, Navigat
 import { generateCampaign, verifyMedia, verifyMediaWithAppeal } from '@/lib/game-logic';
 import { geocodeLocation } from '@/lib/location';
 import { generateQuestImage, generateQuestImageWithDetails } from '@/lib/gemini';
+import { generateLocationTrivia } from '@/lib/location-trivia';
 import { Campaign, VerificationResult, DistanceRange, LocationData, Coordinates, AppealData, MediaCaptureData, XP_REWARDS, XP_DISTANCE_BONUS_PER_KM, getStreakBonus, QuestType, CampaignOptions, StoredCampaign, LocationResearch } from '@/types';
 import { trackEvent } from '@/lib/analytics';
 import MediaScanner from '@/components/MediaScanner';
@@ -97,6 +98,9 @@ export default function Home() {
 
   // Location Info Modal State
   const [showLocationInfo, setShowLocationInfo] = useState(false);
+
+  // Location Trivia State
+  const [locationTrivia, setLocationTrivia] = useState<string[]>([]);
 
   // Ref for auto-scrolling to loading area on setup page
   const loadingRef = useRef<HTMLDivElement>(null);
@@ -551,6 +555,7 @@ export default function Home() {
     setIsLoading(true);
     setCampaignReady(false);
     setPendingCampaign(null);
+    setLocationTrivia([]); // Clear previous trivia
 
     try {
       // Always use guaranteed mix mode: 1 photo, 1 video, 1 audio quest
@@ -572,6 +577,16 @@ export default function Home() {
           });
         }
       };
+
+      // Generate trivia in parallel with campaign generation
+      // Don't await - let it update state as soon as it's ready
+      generateLocationTrivia(geocodedLocation).then(trivia => {
+        console.log('[Campaign] Setting trivia state with', trivia.length, 'facts');
+        setLocationTrivia(trivia);
+      }).catch(error => {
+        console.warn('[Campaign] Failed to generate location trivia:', error);
+        setLocationTrivia([]); // Empty array = no trivia shown
+      });
 
       // Pass LocationData directly instead of string to avoid redundant geocoding
       const newCampaign = await generateCampaign(geocodedLocation, type, distanceRange, campaignOptions);
@@ -1135,7 +1150,7 @@ export default function Home() {
                     message={isResuming ? "RESTORING YOUR ADVENTURE..." : "GENERATING YOUR ADVENTURE..."}
                     subMessage={isResuming ? "Loading your saved progress" : "Creating quests with Gemini 3"}
                     rotatingMessages={isResuming ? RESUME_MESSAGES : GENERATE_MESSAGES}
-                    hint={!isResuming && !imageProgress ? "This can take 1 minute or less - feel free to switch tabs!" : undefined}
+                    trivia={!isResuming ? locationTrivia : undefined}
                     progress={
                       imageProgress
                         ? Math.round((imageProgress.current / imageProgress.total) * 100)

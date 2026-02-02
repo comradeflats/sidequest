@@ -1,9 +1,8 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Compass, Zap, Map, Sparkles, CheckCircle } from 'lucide-react';
-import { MemoryGame } from './MemoryGame';
 
 // Default rotating messages for quest generation
 const DEFAULT_ROTATING_MESSAGES = [
@@ -27,7 +26,8 @@ interface LoadingProgressProps {
   subMessage?: string;
   rotatingMessages?: string[]; // Optional array of messages to rotate through
   progressText?: string; // Optional progress text like "Generating images... (2/3)"
-  hint?: string; // Optional small hint text below rotating messages
+  hint?: string; // Optional small hint text below rotating messages (deprecated, use trivia)
+  trivia?: string[]; // NEW - array of trivia facts to display with animations
   showGame?: boolean; // Show memory game during loading
   campaignReady?: boolean; // Campaign is ready, show button
   onStartAdventure?: () => void; // Callback when user clicks "Start Adventure"
@@ -42,6 +42,7 @@ export default function LoadingProgress({
   rotatingMessages,
   progressText,
   hint,
+  trivia,
   showGame = false,
   campaignReady = false,
   onStartAdventure
@@ -49,9 +50,17 @@ export default function LoadingProgress({
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [iconIndex, setIconIndex] = useState(0);
   const [elapsedTime, setElapsedTime] = useState(0);
+  const [currentTriviaIndex, setCurrentTriviaIndex] = useState(0);
 
   const messages = rotatingMessages || DEFAULT_ROTATING_MESSAGES;
   const displayMessage = rotatingMessages ? messages[currentMessageIndex] : message;
+
+  // Debug: Log when trivia updates
+  useEffect(() => {
+    if (trivia && trivia.length > 0) {
+      console.log('[LoadingProgress] Trivia received:', trivia.length, 'facts');
+    }
+  }, [trivia]);
 
   // Track elapsed time for duration-adaptive messaging
   useEffect(() => {
@@ -95,6 +104,17 @@ export default function LoadingProgress({
     };
   }, [rotatingMessages, message, messages.length, rotationSpeed]);
 
+  // Rotate through trivia facts
+  useEffect(() => {
+    if (!trivia || trivia.length === 0) return;
+
+    const triviaInterval = setInterval(() => {
+      setCurrentTriviaIndex((prev) => (prev + 1) % trivia.length);
+    }, 6000); // Change fact every 6 seconds
+
+    return () => clearInterval(triviaInterval);
+  }, [trivia]);
+
   const IconComponent = LOGO_ICONS[iconIndex];
 
   // Show "Campaign Ready" screen when ready
@@ -136,32 +156,23 @@ export default function LoadingProgress({
 
   return (
     <div className="flex flex-col items-center justify-center gap-6 p-8">
-      {/* Show game during loading if enabled */}
-      {showGame && !campaignReady ? (
-        <MemoryGame isActive={true} />
-      ) : (
-        <>
-          {/* Alternating pixel art icon with glow effect */}
-          <motion.div
-            animate={{
-              scale: [1, 1.15, 1],
-              rotate: [0, 8, -8, 0]
-            }}
-            transition={{
-              duration: 2,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-            className="text-adventure-gold drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]"
-          >
-            <IconComponent className="w-16 h-16" />
-          </motion.div>
-        </>
-      )}
+      {/* Alternating pixel art icon with glow effect */}
+      <motion.div
+        animate={{
+          y: [0, -8, 0]
+        }}
+        transition={{
+          duration: 2,
+          repeat: Infinity,
+          ease: "easeInOut"
+        }}
+        className="text-adventure-gold drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]"
+      >
+        <IconComponent className="w-16 h-16" />
+      </motion.div>
 
-      {/* Progress indicator (smaller, bottom) - only show when not showing game */}
-      {!showGame && (
-        <>
+      {/* Loading message and progress */}
+      <>
           {/* Loading message with fade transition */}
           <div className="flex flex-col items-center gap-2">
             <motion.p
@@ -175,17 +186,42 @@ export default function LoadingProgress({
               {displayMessage}
             </motion.p>
 
-            {/* Hint text below rotating messages */}
-            {hint && (
+            {/* Trivia or hint text below rotating messages */}
+            {trivia && trivia.length > 0 ? (
+              <div className="min-h-[3rem] flex items-center justify-center w-full max-w-md px-4">
+                <AnimatePresence mode="wait">
+                  <motion.p
+                    key={currentTriviaIndex}
+                    initial={{ opacity: 0, y: 5 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -5 }}
+                    transition={{ duration: 0.8, ease: "easeInOut" }}
+                    className="text-sm text-gray-300 font-sans text-center italic leading-relaxed"
+                  >
+                    💡 {trivia[currentTriviaIndex]}
+                  </motion.p>
+                </AnimatePresence>
+              </div>
+            ) : hint ? (
               <p className="text-xs text-gray-500 font-sans text-center">
                 {hint}
               </p>
-            )}
+            ) : null}
           </div>
 
           {/* Progress bar */}
           <div className="w-full max-w-md h-3 bg-zinc-900 rounded-full overflow-hidden border-2 border-adventure-gold/30">
-            {progress !== undefined ? (
+            {showGame ? (
+              // Time-based progress for campaign generation
+              <motion.div
+                className="h-full bg-gradient-to-r from-emerald-500 to-gold-500"
+                style={{ width: `${Math.min((elapsedTime / 50) * 100, 100)}%` }}
+                transition={{
+                  duration: 0.3,
+                  ease: "easeOut"
+                }}
+              />
+            ) : progress !== undefined ? (
               // Determinate progress
               <motion.div
                 className="h-full bg-gradient-to-r from-adventure-gold via-yellow-400 to-adventure-gold transition-all duration-300"
@@ -211,7 +247,11 @@ export default function LoadingProgress({
           </div>
 
           {/* Progress text (priority) or Sub message */}
-          {progressText ? (
+          {showGame ? (
+            <p className="text-xs text-gray-500 text-center font-sans">
+              Estimated: ~50 seconds
+            </p>
+          ) : progressText ? (
             <p className="text-sm text-adventure-emerald font-sans text-center font-semibold">
               {progressText}
             </p>
@@ -241,15 +281,6 @@ export default function LoadingProgress({
             ))}
           </div>
         </>
-      )}
-
-      {/* When showing game, show minimal status below */}
-      {showGame && (
-        <div className="text-sm text-gray-400 text-center">
-          <div className="animate-spin mb-2">⚙️</div>
-          {displayMessage}
-        </div>
-      )}
     </div>
   );
 }

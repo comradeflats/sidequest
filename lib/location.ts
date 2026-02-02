@@ -59,6 +59,11 @@ export async function geocodeLocation(locationString: string): Promise<LocationD
 
     const result = data.results[0];
 
+    // Extract city and country from address components
+    const components = result.address_components || [];
+    const city = components.find((c: { types: string[]; long_name: string }) => c.types.includes('locality'))?.long_name || '';
+    const country = components.find((c: { types: string[]; long_name: string }) => c.types.includes('country'))?.long_name || '';
+
     return {
       name: locationString,
       coordinates: {
@@ -66,6 +71,8 @@ export async function geocodeLocation(locationString: string): Promise<LocationD
         lng: result.geometry.location.lng,
       },
       formattedAddress: result.formatted_address,
+      city: city,
+      country: country,
     };
   } catch (error) {
     throw error;

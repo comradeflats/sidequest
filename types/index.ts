@@ -15,6 +15,8 @@ export interface LocationData {
   name: string;
   coordinates: Coordinates;
   formattedAddress: string;
+  city?: string;         // e.g., "Da Nang"
+  country?: string;      // e.g., "Vietnam"
 }
 
 // Distance data from Distance Matrix API

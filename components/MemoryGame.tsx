@@ -39,9 +39,9 @@ export function MemoryGame({ isActive, onComplete }: MemoryGameProps) {
   // Play the sequence for user to memorize
   const playSequence = async (seq: number[]) => {
     for (let i = 0; i < seq.length; i++) {
-      await new Promise(resolve => setTimeout(resolve, 600));
+      await new Promise(resolve => setTimeout(resolve, 300));
       setHighlightIndex(seq[i]);
-      await new Promise(resolve => setTimeout(resolve, 400));
+      await new Promise(resolve => setTimeout(resolve, 250));
       setHighlightIndex(null);
     }
     setIsUserTurn(true);
@@ -82,11 +82,14 @@ export function MemoryGame({ isActive, onComplete }: MemoryGameProps) {
   return (
     <div className="flex flex-col items-center justify-center p-8 space-y-6">
       {/* Title */}
-      <div className="text-center">
-        <h3 className="text-2xl font-bold text-emerald-400 mb-2">
+      <div className="text-center space-y-1">
+        <h3 className="text-xl font-bold text-emerald-400">
           Quest Memory Challenge
         </h3>
-        <p className="text-gray-300 text-sm">
+        <p className="text-xs text-gray-500 italic font-sans">
+          Play while your quest generates!
+        </p>
+        <p className="text-gray-300 text-sm mt-2">
           {isUserTurn ? 'Repeat the pattern!' : 'Watch carefully...'}
         </p>
       </div>
@@ -104,7 +107,7 @@ export function MemoryGame({ isActive, onComplete }: MemoryGameProps) {
       </motion.div>
 
       {/* Game Grid */}
-      <div className="grid grid-cols-2 gap-4">
+      <div className="grid grid-cols-2 gap-3">
         {GAME_ICONS.map((iconData, index) => {
           const IconComponent = iconData.icon;
           const isHighlighted = highlightIndex === index;
@@ -116,7 +119,7 @@ export function MemoryGame({ isActive, onComplete }: MemoryGameProps) {
               onClick={() => handleSymbolClick(index)}
               disabled={!isClickable}
               className={`
-                w-24 h-24 rounded-lg flex items-center justify-center
+                w-16 h-16 rounded-lg flex items-center justify-center
                 transition-all duration-200
                 ${isClickable ? 'cursor-pointer hover:scale-105' : 'cursor-default'}
                 ${gameOver ? 'opacity-50' : 'opacity-100'}
@@ -133,13 +136,28 @@ export function MemoryGame({ isActive, onComplete }: MemoryGameProps) {
               whileTap={isClickable ? { scale: 0.95 } : {}}
             >
               <IconComponent
-                size={48}
+                size={32}
                 color="white"
               />
             </motion.button>
           );
         })}
       </div>
+
+      {/* Repeat Pattern Button */}
+      {isUserTurn && !gameOver && (
+        <motion.button
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          onClick={() => {
+            setIsUserTurn(false);
+            playSequence(sequence);
+          }}
+          className="px-4 py-2 bg-gray-700 hover:bg-gray-600 rounded-lg text-sm font-semibold transition-colors text-gray-300"
+        >
+          🔄 Replay Pattern
+        </motion.button>
+      )}
 
       {/* Game Over / Restart */}
       {gameOver && (
