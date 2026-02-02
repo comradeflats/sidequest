@@ -9,10 +9,10 @@ import { LocationData } from '@/types';
 
 /**
  * Generate location-based trivia facts using Gemini API
- * Runs in parallel with campaign generation
+ * Pre-generates during geocoding for instant display
  *
  * @param locationData - Location data with city/country
- * @returns Array of 6 short trivia facts
+ * @returns Array of 4 short trivia facts
  */
 export async function generateLocationTrivia(
   locationData: LocationData
@@ -31,19 +31,18 @@ export async function generateLocationTrivia(
   const country = locationData.country || '';
   const location = country ? `${city}, ${country}` : city;
 
-  const prompt = `Generate 6 interesting, fun trivia facts about ${location}.
+  const prompt = `Generate 4 short, interesting trivia facts about ${location}.
 
 Requirements:
-- Each fact should be SHORT (1 sentence, max 15 words)
-- Focus on culture, history, food, geography, or unique characteristics
-- Make them engaging and surprising
-- Avoid controversial topics
-- Format: Return ONLY the facts, one per line, no numbering or bullets
+- Each fact: 1 sentence, max 12 words
+- Focus on culture, history, food, or unique features
+- Make them surprising and fun
+- Return ONLY facts, one per line, no numbering
 
-Example format:
-The city is known for its famous bridges spanning the river
-Local cuisine features a unique blend of flavors
-The region has over 300 days of sunshine per year`;
+Example:
+The city is famous for its floating markets
+Local dish combines French and Vietnamese flavors
+Over 300 sunny days each year`;
 
   try {
     console.log('[Trivia] Generating trivia for:', location);
@@ -56,7 +55,7 @@ The region has over 300 days of sunshine per year`;
       .map(f => f.trim())
       .filter(f => f.length > 0 && f.length < 150); // Filter valid facts
 
-    const triviaFacts = facts.slice(0, 6); // Return max 6 facts
+    const triviaFacts = facts.slice(0, 4); // Return max 4 facts (faster generation)
     console.log('[Trivia] Generated', triviaFacts.length, 'facts:', triviaFacts);
     return triviaFacts;
   } catch (error) {

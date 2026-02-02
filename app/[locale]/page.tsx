@@ -303,6 +303,17 @@ export default function Home() {
     try {
       const locationData = await geocodeLocation(location);
       setGeocodedLocation(locationData);
+
+      // Pre-generate trivia immediately after geocoding
+      // This way it's ready instantly when user clicks quest button
+      console.log('[Geocode] Starting trivia generation for', locationData.name);
+      generateLocationTrivia(locationData).then(trivia => {
+        console.log('[Geocode] Trivia ready:', trivia.length, 'facts');
+        setLocationTrivia(trivia);
+      }).catch(error => {
+        console.warn('[Geocode] Failed to generate trivia:', error);
+        setLocationTrivia([]);
+      });
     } catch {
       setGeocodeError('Location not found. Try a full address or city name.');
       setGeocodedLocation(null);
@@ -314,6 +325,7 @@ export default function Home() {
   const handleChangeLocation = () => {
     setGeocodedLocation(null);
     setGeocodeError(null);
+    setLocationTrivia([]); // Clear trivia when changing location
   };
 
   const handleResumeCampaign = async () => {
@@ -555,7 +567,7 @@ export default function Home() {
     setIsLoading(true);
     setCampaignReady(false);
     setPendingCampaign(null);
-    setLocationTrivia([]); // Clear previous trivia
+    // Keep trivia from geocoding - it's already been pre-generated
 
     try {
       // Always use guaranteed mix mode: 1 photo, 1 video, 1 audio quest
@@ -578,15 +590,7 @@ export default function Home() {
         }
       };
 
-      // Generate trivia in parallel with campaign generation
-      // Don't await - let it update state as soon as it's ready
-      generateLocationTrivia(geocodedLocation).then(trivia => {
-        console.log('[Campaign] Setting trivia state with', trivia.length, 'facts');
-        setLocationTrivia(trivia);
-      }).catch(error => {
-        console.warn('[Campaign] Failed to generate location trivia:', error);
-        setLocationTrivia([]); // Empty array = no trivia shown
-      });
+      // Trivia was already pre-generated during geocoding, so it shows instantly!
 
       // Pass LocationData directly instead of string to avoid redundant geocoding
       const newCampaign = await generateCampaign(geocodedLocation, type, distanceRange, campaignOptions);
