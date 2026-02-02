@@ -22,6 +22,7 @@ import ThinkingPanel from '@/components/ThinkingPanel';
 import CollapsibleToolbar from '@/components/CollapsibleToolbar';
 import ImageGenerationError, { ImageErrorDetails } from '@/components/ImageGenerationError';
 import LocationInfoModal from '@/components/LocationInfoModal';
+import DebugPanel from '@/components/DebugPanel';
 import {
   getCurrentCampaignId,
   loadCampaign,
@@ -1520,6 +1521,9 @@ export default function Home() {
           unitSystem={unitSystem}
         />
       </div>
+
+      {/* Debug Panel */}
+      <DebugPanel isGenerating={isLoading || isResuming} />
     </main>
   );
 }

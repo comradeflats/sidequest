@@ -3,6 +3,7 @@ import { geocodeLocation, calculateDistance } from './location';
 import { getQuestLocations } from './places';
 import { costEstimator } from './cost-estimator';
 import { generateBatchLocationResearch } from './location-research';
+import { generationTracker } from './generation-tracker';
 import { Campaign, Quest, DistanceRange, DISTANCE_RANGES, PlaceData, Coordinates, AppealData, AppealResult, VerificationResult, CampaignOptions, MediaCaptureData, QuestType, MediaRequirements, LocationResearch, CampaignReasoning, GPS_DISTANCE_THRESHOLDS } from '../types';
 
 /**
@@ -132,19 +133,29 @@ export async function generateCampaign(
   const startTime = Date.now();
   console.log('⏱️ Campaign generation started');
 
-  // STEP 1: Geocode the starting location
-  const step1Start = Date.now();
-  const locationData = await geocodeLocation(location);
-  console.log(`✅ Step 1 (Geocode): ${Date.now() - step1Start}ms`);
+  // Start generation tracking
+  generationTracker.startGeneration();
 
-  // STEP 2: Get quest locations using Places API (with fallback to random coordinates)
-  const step2Start = Date.now();
-  const questLocations = await getQuestLocations(
-    locationData.coordinates,
-    distanceRange,
-    questCount
-  );
-  console.log(`✅ Step 2 (Places API): ${Date.now() - step2Start}ms`);
+  try {
+    // STEP 1: Geocode the starting location
+    generationTracker.startStep(1, { apiCalls: 1 });
+    const step1Start = Date.now();
+    const locationData = await geocodeLocation(location);
+    const step1Duration = Date.now() - step1Start;
+    generationTracker.completeStep(1, { apiCalls: 1, cost: 0.005 });
+    console.log(`✅ Step 1 (Geocode): ${step1Duration}ms`);
+
+    // STEP 2: Get quest locations using Places API (with fallback to random coordinates)
+    generationTracker.startStep(2, { apiCalls: 1 });
+    const step2Start = Date.now();
+    const questLocations = await getQuestLocations(
+      locationData.coordinates,
+      distanceRange,
+      questCount
+    );
+    const step2Duration = Date.now() - step2Start;
+    generationTracker.completeStep(2, { apiCalls: 1, cost: 0.017 });
+    console.log(`✅ Step 2 (Places API): ${step2Duration}ms`);
 
   // Extract coordinates from quest locations (whether PlaceData or Coordinates)
   const questCoords: Coordinates[] = questLocations.map((loc) =>
@@ -155,13 +166,16 @@ export async function generateCampaign(
   const startPoint = locationData.coordinates;
   const allPoints = [startPoint, ...questCoords];
 
-  // STEP 3: Parallel distance calculations for faster campaign generation
-  const step3Start = Date.now();
-  const distancePromises = questCoords.map((_, i) =>
-    calculateDistance(allPoints[i], allPoints[i + 1])
-  );
-  const distanceResults = await Promise.all(distancePromises);
-  console.log(`✅ Step 3 (Distance calculations): ${Date.now() - step3Start}ms`);
+    // STEP 3: Parallel distance calculations for faster campaign generation
+    generationTracker.startStep(3, { apiCalls: questCoords.length });
+    const step3Start = Date.now();
+    const distancePromises = questCoords.map((_, i) =>
+      calculateDistance(allPoints[i], allPoints[i + 1])
+    );
+    const distanceResults = await Promise.all(distancePromises);
+    const step3Duration = Date.now() - step3Start;
+    generationTracker.completeStep(3, { apiCalls: questCoords.length, cost: questCoords.length * 0.005 });
+    console.log(`✅ Step 3 (Distance calculations): ${step3Duration}ms`);
 
   const distances: number[] = distanceResults.map(r => r.distanceKm);
   const durations: number[] = distanceResults.map(r => r.durationMinutes);
@@ -269,39 +283,59 @@ export async function generateCampaign(
       formattedAddress: place.formattedAddress
     }));
 
-  // STEP 4: Run campaign generation and location research in parallel for 5-10s speedup
-  const step4Start = Date.now();
-  const [campaignResult, locationResearchData] = await Promise.all([
-    // Campaign generation
-    (async () => {
-      const result = await model.generateContent(prompt);
-      const response = await result.response;
-      return response.text();
-    })(),
-    // Location research (parallel)
-    (async () => {
-      if (placesToResearch.length > 0) {
-        try {
-          return await generateBatchLocationResearch(placesToResearch);
-        } catch (error) {
-          console.error('Failed to generate location research:', error);
-          return [];
+    // STEP 4 & 5: Run campaign generation and location research in parallel for 5-10s speedup
+    generationTracker.startStep(4, { apiCalls: 1 });
+    generationTracker.startStep(5, { apiCalls: placesToResearch.length });
+    const step4Start = Date.now();
+    const [campaignResult, locationResearchData] = await Promise.all([
+      // Campaign generation
+      (async () => {
+        const result = await model.generateContent(prompt);
+        const response = await result.response;
+        return response.text();
+      })(),
+      // Location research (parallel)
+      (async () => {
+        if (placesToResearch.length > 0) {
+          try {
+            return await generateBatchLocationResearch(placesToResearch);
+          } catch (error) {
+            console.error('Failed to generate location research:', error);
+            return [];
+          }
         }
-      }
-      return [];
-    })()
-  ]);
-  console.log(`✅ Step 4 (Campaign + Research parallel): ${Date.now() - step4Start}ms`);
+        return [];
+      })()
+    ]);
+    const step4Duration = Date.now() - step4Start;
 
-  const text = campaignResult;
+    // Track campaign generation completion (Step 4)
+    const campaignTokens = Math.ceil((prompt.length + campaignResult.length) / 4);
+    const campaignCost = (prompt.length / 4 / 1_000_000) * 0.075 + (campaignResult.length / 4 / 1_000_000) * 0.30;
+    generationTracker.completeStep(4, { apiCalls: 1, tokenCount: campaignTokens, cost: campaignCost });
 
-  // Track Output Tokens
-  costEstimator.trackGeminiOutput(text.length);
+    // Track location research completion (Step 5)
+    const researchTokens = placesToResearch.length > 0 ? Math.ceil(placesToResearch.length * 500) : 0;
+    const researchCost = placesToResearch.length > 0 ? placesToResearch.length * 0.001 : 0;
+    generationTracker.completeStep(5, { apiCalls: placesToResearch.length, tokenCount: researchTokens, cost: researchCost });
 
-  try {
+    console.log(`✅ Step 4 (Campaign + Research parallel): ${step4Duration}ms`);
+
+    const text = campaignResult;
+
+    // Track Output Tokens
+    costEstimator.trackGeminiOutput(text.length);
+
+    // STEP 6: Metadata Enrichment (implicit - happens during JSON parsing and processing)
+    generationTracker.startStep(6);
+    const step6Start = Date.now();
+
+    // STEP 7: JSON Parsing
+    generationTracker.startStep(7);
     const campaignData = JSON.parse(text);
+    generationTracker.completeStep(7, { cost: 0 });
 
-    // STEP 5: Extract and process campaign generation reasoning
+    // STEP 6: Extract and process campaign generation reasoning
     // GEMINI 3 FEATURE: Adds 5-6K tokens of design rationale
     let campaignReasoning: CampaignReasoning | undefined;
     if (campaignData.reasoning) {
@@ -320,7 +354,7 @@ export async function generateCampaign(
       };
     }
 
-    // STEP 6: Enrich quest data with coordinates, distance, and place metadata
+    // Continue STEP 6: Enrich quest data with coordinates, distance, and place metadata
     const questsWithMetadata = campaignData.quests.map((quest: Quest, i: number) => {
       const location = questLocations[i];
       const isPlace = 'placeId' in location;
@@ -338,7 +372,11 @@ export async function generateCampaign(
       };
     });
 
+    const step6Duration = Date.now() - step6Start;
+    generationTracker.completeStep(6, { cost: 0 });
+
     // STEP 8: Generate images in parallel with progress tracking
+    generationTracker.startStep(8, { imageCount: questsWithMetadata.length });
     const step8Start = Date.now();
     let completedCount = 0;
     const imagePromises = questsWithMetadata.map(async (quest: Quest) => {
@@ -357,8 +395,14 @@ export async function generateCampaign(
     });
 
     const questsWithImages = await Promise.all(imagePromises);
-    console.log(`✅ Step 8 (Image generation parallel): ${Date.now() - step8Start}ms`);
+    const step8Duration = Date.now() - step8Start;
+    const imageCost = questsWithMetadata.length * 0.040; // ~$0.04 per image
+    generationTracker.completeStep(8, { imageCount: questsWithMetadata.length, apiCalls: questsWithMetadata.length, cost: imageCost });
+    console.log(`✅ Step 8 (Image generation parallel): ${step8Duration}ms`);
     console.log(`🎉 Total campaign generation time: ${Date.now() - startTime}ms`);
+
+    // End generation tracking
+    generationTracker.endGeneration();
 
     return {
       ...campaignData,
@@ -374,7 +418,11 @@ export async function generateCampaign(
       locationResearch: locationResearchData.length > 0 ? locationResearchData : undefined,
       generationReasoning: campaignReasoning,
     };
-  } catch {
+  } catch (error) {
+    // Track generation failure
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+    generationTracker.failStep(7, errorMessage); // JSON parsing is usually where it fails
+    generationTracker.endGeneration();
     throw new Error('Failed to generate valid campaign JSON');
   }
 }
