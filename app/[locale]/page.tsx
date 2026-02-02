@@ -45,6 +45,8 @@ export default function Home() {
   const [distanceRange, setDistanceRange] = useState<DistanceRange | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [campaign, setCampaign] = useState<Campaign | null>(null);
+  const [campaignReady, setCampaignReady] = useState(false);
+  const [pendingCampaign, setPendingCampaign] = useState<Campaign | null>(null);
 
   // Geocoding State
   const [geocodedLocation, setGeocodedLocation] = useState<LocationData | null>(null);
@@ -79,6 +81,9 @@ export default function Home() {
   // Image Generation Error State
   const [imageGenErrors, setImageGenErrors] = useState<ImageErrorDetails[]>([]);
   const [retryingImages, setRetryingImages] = useState<Set<string>>(new Set());
+
+  // Image Loading State - tracks which quest images are currently being generated
+  const [questImagesLoading, setQuestImagesLoading] = useState<Set<string>>(new Set());
 
   // Background Tab State
   const [isPausedDueToBackground, setIsPausedDueToBackground] = useState(false);
@@ -328,6 +333,7 @@ export default function Home() {
       setIsLoading(true);
       setIsResuming(true);
       setImageProgress(null);
+      setQuestImagesLoading(new Set(questsNeedingImages.map(q => q.id)));
 
       try {
         // Parallel regeneration with live progress tracking
@@ -340,11 +346,20 @@ export default function Home() {
             completedCount++;
             setImageProgress({ current: completedCount, total: questsNeedingImages.length });
 
+            // Remove from loading set
+            setQuestImagesLoading(prev => {
+              const next = new Set(prev);
+              next.delete(quest.id);
+              return next;
+            });
+
             if (result.url) {
               quest.imageUrl = result.url;
+              quest.imageGenerationFailed = false;
             } else {
               // First failure - track for retry UI
               quest.imageUrl = undefined;
+              quest.imageGenerationFailed = true;
               if (result.error) {
                 newErrors.push({
                   questId: quest.id,
@@ -358,7 +373,16 @@ export default function Home() {
             // Continue even if image fails
             completedCount++;
             setImageProgress({ current: completedCount, total: questsNeedingImages.length });
+
+            // Remove from loading set
+            setQuestImagesLoading(prev => {
+              const next = new Set(prev);
+              next.delete(quest.id);
+              return next;
+            });
+
             quest.imageUrl = undefined;
+            quest.imageGenerationFailed = true;
             newErrors.push({
               questId: quest.id,
               questTitle: quest.title,
@@ -381,6 +405,7 @@ export default function Home() {
         setIsLoading(false);
         setIsResuming(false);
         setImageProgress(null);
+        setQuestImagesLoading(new Set());
       }
     }
 
@@ -440,8 +465,9 @@ export default function Home() {
   const handleRetryImage = async (questId: string) => {
     if (!campaign) return;
 
-    // Mark as retrying
+    // Mark as retrying and loading
     setRetryingImages(prev => new Set(prev).add(questId));
+    setQuestImagesLoading(prev => new Set(prev).add(questId));
 
     // Find the quest
     const quest = campaign.quests.find(q => q.id === questId);
@@ -454,12 +480,14 @@ export default function Home() {
       if (result.url) {
         // Success! Update the quest
         quest.imageUrl = result.url;
+        quest.imageGenerationFailed = false;
         setCampaign({ ...campaign });
 
         // Remove from errors
         setImageGenErrors(prev => prev.filter(e => e.questId !== questId));
       } else {
         // Still failed - update error with new attempt count
+        quest.imageGenerationFailed = true;
         setImageGenErrors(prev =>
           prev.map(e =>
             e.questId === questId
@@ -470,14 +498,20 @@ export default function Home() {
       }
     } catch {
       // Retry failed
+      quest.imageGenerationFailed = true;
       setImageGenErrors(prev =>
         prev.map(e =>
           e.questId === questId ? { ...e, retries: e.retries + 1 } : e
         )
       );
     } finally {
-      // Remove from retrying set
+      // Remove from retrying and loading sets
       setRetryingImages(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(questId);
+        return newSet;
+      });
+      setQuestImagesLoading(prev => {
         const newSet = new Set(prev);
         newSet.delete(questId);
         return newSet;
@@ -512,8 +546,12 @@ export default function Home() {
     resetSessionContext();
     setImageProgress(null);
     setImageGenErrors([]);
+    setQuestImagesLoading(new Set());
 
     setIsLoading(true);
+    setCampaignReady(false);
+    setPendingCampaign(null);
+
     try {
       // Always use guaranteed mix mode: 1 photo, 1 video, 1 audio quest
       const campaignOptions: CampaignOptions = {
@@ -522,20 +560,27 @@ export default function Home() {
         guaranteedMix: true,
         onProgress: (current, total) => {
           setImageProgress({ current, total });
+        },
+        onImageStart: (questId: string) => {
+          setQuestImagesLoading(prev => new Set(prev).add(questId));
+        },
+        onImageComplete: (questId: string) => {
+          setQuestImagesLoading(prev => {
+            const next = new Set(prev);
+            next.delete(questId);
+            return next;
+          });
         }
       };
 
-      // Use geocodedLocation.name to pass to generateCampaign (which will geocode again)
-      // The function will re-geocode, but we've already confirmed the location is valid
-      const newCampaign = await generateCampaign(geocodedLocation.name, type, distanceRange, campaignOptions);
+      // Pass LocationData directly instead of string to avoid redundant geocoding
+      const newCampaign = await generateCampaign(geocodedLocation, type, distanceRange, campaignOptions);
 
-      // Show campaign immediately - images are already generated by generateCampaign
-      setCampaign(newCampaign);
-      setIsLoading(false);
-      setImageProgress(null);
-      window.scrollTo({ top: 0, behavior: 'smooth' });
+      // Campaign ready! Store it and show button
+      setPendingCampaign(newCampaign);
+      setCampaignReady(true);
 
-      // Track campaign creation
+      // Track campaign creation (will show when user clicks Start Adventure)
       trackEvent({
         name: 'campaign_created',
         params: {
@@ -547,7 +592,10 @@ export default function Home() {
       });
     } catch (error: unknown) {
       setIsLoading(false);
+      setCampaignReady(false);
+      setPendingCampaign(null);
       setImageProgress(null);
+      setQuestImagesLoading(new Set());
 
       const errorMessage = error instanceof Error ? error.message : 'Failed to initialize adventure.';
       // Show user-friendly error without exposing technical details
@@ -557,6 +605,20 @@ export default function Home() {
         alert('Failed to create adventure. Please try again.');
       }
     }
+  };
+
+  // Handle "Start Adventure" button click
+  const handleStartAdventure = () => {
+    if (!pendingCampaign) return;
+
+    // Show the campaign
+    setCampaign(pendingCampaign);
+    setPendingCampaign(null);
+    setIsLoading(false);
+    setCampaignReady(false);
+    setImageProgress(null);
+    setQuestImagesLoading(new Set());
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const handleCapture = async (captureData: MediaCaptureData) => {
@@ -1084,6 +1146,9 @@ export default function Home() {
                         ? `Generating quest images... (${imageProgress.current}/${imageProgress.total})`
                         : undefined
                     }
+                    showGame={!isResuming}
+                    campaignReady={campaignReady}
+                    onStartAdventure={handleStartAdventure}
                   />
                 </div>
               )}
@@ -1180,62 +1245,108 @@ export default function Home() {
 
                 return (
                   <>
-                    {/* Quest Image - Hero Position */}
-                    {currentQuest.imageUrl && !currentQuest.imageGenerationFailed && (
-                      <div className="relative -mx-6 mb-6 quest-image-hero overflow-hidden">
-                        <img
-                          src={currentQuest.imageUrl}
-                          alt={currentQuest.title}
-                          className="w-full h-full object-cover image-rendering-pixelated"
-                          loading="lazy"
-                        />
-                        {/* Quest Number Badge */}
-                        <div className="absolute top-4 right-4 flex gap-2 z-10">
-                          {/* Quest Type Badge */}
-                          {currentQuest.questType && currentQuest.questType !== 'PHOTO' && (
-                            <div className={`bg-black/80 border-2 px-2 py-1 rounded flex items-center gap-1 ${
-                              currentQuest.questType === 'VIDEO' ? 'border-red-500 text-red-400' : 'border-purple-500 text-purple-400'
-                            }`}>
-                              {currentQuest.questType === 'VIDEO' ? <Video className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
-                              <span className="font-pixel text-xs">{currentQuest.questType}</span>
-                            </div>
-                          )}
-                          <div className="bg-black/80 border-2 border-adventure-gold px-3 py-1 rounded">
-                            <span className="font-pixel text-adventure-gold text-xs">
-                              {questNumber}/{totalQuests}
-                            </span>
-                          </div>
-                        </div>
-                        {/* Gradient Overlay */}
-                        <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/50 pointer-events-none" />
-                      </div>
-                    )}
+                    {/* Quest Image - with proper loading state management */}
+                    {(() => {
+                      const isImageLoading = questImagesLoading.has(currentQuest.id);
+                      const hasImageUrl = !!currentQuest.imageUrl;
+                      const imageFailed = currentQuest.imageGenerationFailed;
 
-                    {/* Image Loading/Failed State */}
-                    {!currentQuest.imageUrl && (
-                      <div className="relative -mx-6 mb-6 quest-image-hero overflow-hidden bg-zinc-900 flex items-center justify-center">
-                        <div className="text-center py-12">
-                          <div className="w-12 h-12 border-4 border-adventure-gold border-t-transparent rounded-full animate-spin mx-auto mb-3" />
-                          <p className="text-xs font-pixel text-gray-500">LOADING IMAGE...</p>
-                        </div>
-                        {/* Quest Number Badge - still show even when loading */}
-                        <div className="absolute top-4 right-4 flex gap-2 z-10">
-                          {currentQuest.questType && currentQuest.questType !== 'PHOTO' && (
-                            <div className={`bg-black/80 border-2 px-2 py-1 rounded flex items-center gap-1 ${
-                              currentQuest.questType === 'VIDEO' ? 'border-red-500 text-red-400' : 'border-purple-500 text-purple-400'
-                            }`}>
-                              {currentQuest.questType === 'VIDEO' ? <Video className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
-                              <span className="font-pixel text-xs">{currentQuest.questType}</span>
+                      // Case 1: Image is successfully loaded
+                      if (hasImageUrl && !imageFailed) {
+                        return (
+                          <div className="relative -mx-6 mb-6 quest-image-hero overflow-hidden">
+                            <img
+                              src={currentQuest.imageUrl}
+                              alt={currentQuest.title}
+                              className="w-full h-full object-cover image-rendering-pixelated"
+                              loading="lazy"
+                            />
+                            {/* Quest Number Badge */}
+                            <div className="absolute top-4 right-4 flex gap-2 z-10">
+                              {/* Quest Type Badge */}
+                              {currentQuest.questType && currentQuest.questType !== 'PHOTO' && (
+                                <div className={`bg-black/80 border-2 px-2 py-1 rounded flex items-center gap-1 ${
+                                  currentQuest.questType === 'VIDEO' ? 'border-red-500 text-red-400' : 'border-purple-500 text-purple-400'
+                                }`}>
+                                  {currentQuest.questType === 'VIDEO' ? <Video className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                                  <span className="font-pixel text-xs">{currentQuest.questType}</span>
+                                </div>
+                              )}
+                              <div className="bg-black/80 border-2 border-adventure-gold px-3 py-1 rounded">
+                                <span className="font-pixel text-adventure-gold text-xs">
+                                  {questNumber}/{totalQuests}
+                                </span>
+                              </div>
                             </div>
-                          )}
-                          <div className="bg-black/80 border-2 border-adventure-gold px-3 py-1 rounded">
-                            <span className="font-pixel text-adventure-gold text-xs">
-                              {questNumber}/{totalQuests}
-                            </span>
+                            {/* Gradient Overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/50 pointer-events-none" />
                           </div>
-                        </div>
-                      </div>
-                    )}
+                        );
+                      }
+
+                      // Case 2: Image is currently loading
+                      if (isImageLoading) {
+                        return (
+                          <div className="relative -mx-6 mb-6 quest-image-hero overflow-hidden bg-zinc-900 flex items-center justify-center">
+                            <div className="text-center py-12">
+                              <div className="w-12 h-12 border-4 border-adventure-gold border-t-transparent rounded-full animate-spin mx-auto mb-3" />
+                              <p className="text-xs font-pixel text-gray-500">LOADING IMAGE...</p>
+                            </div>
+                            {/* Quest Number Badge */}
+                            <div className="absolute top-4 right-4 flex gap-2 z-10">
+                              {currentQuest.questType && currentQuest.questType !== 'PHOTO' && (
+                                <div className={`bg-black/80 border-2 px-2 py-1 rounded flex items-center gap-1 ${
+                                  currentQuest.questType === 'VIDEO' ? 'border-red-500 text-red-400' : 'border-purple-500 text-purple-400'
+                                }`}>
+                                  {currentQuest.questType === 'VIDEO' ? <Video className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                                  <span className="font-pixel text-xs">{currentQuest.questType}</span>
+                                </div>
+                              )}
+                              <div className="bg-black/80 border-2 border-adventure-gold px-3 py-1 rounded">
+                                <span className="font-pixel text-adventure-gold text-xs">
+                                  {questNumber}/{totalQuests}
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      }
+
+                      // Case 3: Image failed to load - use placeholder
+                      if (imageFailed || (!hasImageUrl && !isImageLoading)) {
+                        const placeholderImage = generatePlaceholderImage(currentQuest);
+                        return (
+                          <div className="relative -mx-6 mb-6 quest-image-hero overflow-hidden">
+                            <img
+                              src={placeholderImage}
+                              alt={currentQuest.title}
+                              className="w-full h-full object-cover"
+                              loading="lazy"
+                            />
+                            {/* Quest Number Badge */}
+                            <div className="absolute top-4 right-4 flex gap-2 z-10">
+                              {currentQuest.questType && currentQuest.questType !== 'PHOTO' && (
+                                <div className={`bg-black/80 border-2 px-2 py-1 rounded flex items-center gap-1 ${
+                                  currentQuest.questType === 'VIDEO' ? 'border-red-500 text-red-400' : 'border-purple-500 text-purple-400'
+                                }`}>
+                                  {currentQuest.questType === 'VIDEO' ? <Video className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                                  <span className="font-pixel text-xs">{currentQuest.questType}</span>
+                                </div>
+                              )}
+                              <div className="bg-black/80 border-2 border-adventure-gold px-3 py-1 rounded">
+                                <span className="font-pixel text-adventure-gold text-xs">
+                                  {questNumber}/{totalQuests}
+                                </span>
+                              </div>
+                            </div>
+                            {/* Gradient Overlay */}
+                            <div className="absolute inset-0 bg-gradient-to-b from-transparent via-transparent to-black/50 pointer-events-none" />
+                          </div>
+                        );
+                      }
+
+                      return null;
+                    })()}
 
                     {/* Quest Card */}
                     <div className="quest-card p-6 rounded-lg space-y-4 quest-card-corners">

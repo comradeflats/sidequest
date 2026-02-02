@@ -4,7 +4,7 @@ import { getQuestLocations } from './places';
 import { costEstimator } from './cost-estimator';
 import { generateBatchLocationResearch } from './location-research';
 import { generationTracker } from './generation-tracker';
-import { Campaign, Quest, DistanceRange, DISTANCE_RANGES, PlaceData, Coordinates, AppealData, AppealResult, VerificationResult, CampaignOptions, MediaCaptureData, QuestType, MediaRequirements, LocationResearch, CampaignReasoning, GPS_DISTANCE_THRESHOLDS } from '../types';
+import { Campaign, Quest, DistanceRange, DISTANCE_RANGES, PlaceData, Coordinates, AppealData, AppealResult, VerificationResult, CampaignOptions, MediaCaptureData, QuestType, MediaRequirements, LocationData, LocationResearch, CampaignReasoning, GPS_DISTANCE_THRESHOLDS } from '../types';
 
 /**
  * Build quest type instructions for campaign generation prompt
@@ -120,7 +120,7 @@ function buildQuestTypeInstructions(enableVideo: boolean, enableAudio: boolean, 
 }
 
 export async function generateCampaign(
-  location: string,
+  locationData: LocationData,
   type: 'short' | 'long',
   distanceRange: DistanceRange,
   options?: CampaignOptions
@@ -137,13 +137,8 @@ export async function generateCampaign(
   generationTracker.startGeneration();
 
   try {
-    // STEP 1: Geocode the starting location
-    generationTracker.startStep(1, { apiCalls: 1 });
-    const step1Start = Date.now();
-    const locationData = await geocodeLocation(location);
-    const step1Duration = Date.now() - step1Start;
-    generationTracker.completeStep(1, { apiCalls: 1, cost: 0.005 });
-    console.log(`✅ Step 1 (Geocode): ${step1Duration}ms`);
+    // STEP 1: REMOVED - Location is already geocoded
+    // Frontend passes LocationData directly to avoid redundant API call (~300ms savings)
 
     // STEP 2: Get quest locations using Places API (with fallback to random coordinates)
     generationTracker.startStep(2, { apiCalls: 1 });
@@ -240,7 +235,7 @@ export async function generateCampaign(
     The output MUST be a JSON object matching this structure:
     {
       "id": "unique-id",
-      "location": "${location}",
+      "location": "${locationData.name}",
       "type": "${type}",
       "reasoning": {
         "locationSelection": ["Reason for quest 1 location", "Reason for quest 2 location", ...],
@@ -380,18 +375,42 @@ export async function generateCampaign(
     const step8Start = Date.now();
     let completedCount = 0;
     const imagePromises = questsWithMetadata.map(async (quest: Quest) => {
-      const imageUrl = await generateQuestImage(quest); // Uses optimized 30s default timeout
+      // Notify image generation start
+      options?.onImageStart?.(quest.id);
 
-      completedCount++;
-      if (options?.onProgress) {
-        options.onProgress(completedCount, questsWithMetadata.length);
+      try {
+        const imageUrl = await generateQuestImage(quest, 30000, 2); // Uses optimized 30s default timeout
+
+        completedCount++;
+        if (options?.onProgress) {
+          options.onProgress(completedCount, questsWithMetadata.length);
+        }
+
+        // Notify image generation complete
+        options?.onImageComplete?.(quest.id);
+
+        return {
+          ...quest,
+          imageUrl,
+          imageGenerationFailed: !imageUrl,
+        };
+      } catch (error) {
+        console.error(`Failed to generate image for quest ${quest.id}:`, error);
+
+        completedCount++;
+        if (options?.onProgress) {
+          options.onProgress(completedCount, questsWithMetadata.length);
+        }
+
+        // Notify image generation complete (even on failure)
+        options?.onImageComplete?.(quest.id);
+
+        return {
+          ...quest,
+          imageUrl: undefined,
+          imageGenerationFailed: true,
+        };
       }
-
-      return {
-        ...quest,
-        imageUrl,
-        imageGenerationFailed: !imageUrl,
-      };
     });
 
     const questsWithImages = await Promise.all(imagePromises);

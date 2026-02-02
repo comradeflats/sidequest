@@ -2,7 +2,8 @@
 
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { MapPin, Compass, Zap, Map, Sparkles } from 'lucide-react';
+import { MapPin, Compass, Zap, Map, Sparkles, CheckCircle } from 'lucide-react';
+import { MemoryGame } from './MemoryGame';
 
 // Default rotating messages for quest generation
 const DEFAULT_ROTATING_MESSAGES = [
@@ -27,6 +28,9 @@ interface LoadingProgressProps {
   rotatingMessages?: string[]; // Optional array of messages to rotate through
   progressText?: string; // Optional progress text like "Generating images... (2/3)"
   hint?: string; // Optional small hint text below rotating messages
+  showGame?: boolean; // Show memory game during loading
+  campaignReady?: boolean; // Campaign is ready, show button
+  onStartAdventure?: () => void; // Callback when user clicks "Start Adventure"
 }
 
 const LOGO_ICONS = [MapPin, Compass, Zap, Map, Sparkles];
@@ -37,7 +41,10 @@ export default function LoadingProgress({
   subMessage,
   rotatingMessages,
   progressText,
-  hint
+  hint,
+  showGame = false,
+  campaignReady = false,
+  onStartAdventure
 }: LoadingProgressProps) {
   const [currentMessageIndex, setCurrentMessageIndex] = useState(0);
   const [iconIndex, setIconIndex] = useState(0);
@@ -90,102 +97,159 @@ export default function LoadingProgress({
 
   const IconComponent = LOGO_ICONS[iconIndex];
 
+  // Show "Campaign Ready" screen when ready
+  if (campaignReady) {
+    return (
+      <div className="flex flex-col items-center justify-center gap-6 p-8">
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          transition={{ type: "spring", stiffness: 200, damping: 15 }}
+        >
+          <CheckCircle className="w-24 h-24 text-emerald-400" />
+        </motion.div>
+
+        <div className="text-center space-y-2">
+          <h2 className="text-3xl font-bold text-emerald-400 font-pixel">
+            YOUR QUEST IS READY!
+          </h2>
+          <p className="text-gray-400 text-sm font-sans">
+            Your adventure awaits
+          </p>
+        </div>
+
+        <motion.button
+          onClick={onStartAdventure}
+          className="px-8 py-4 bg-gradient-to-r from-emerald-500 to-gold-500
+                     hover:from-emerald-600 hover:to-gold-600
+                     rounded-lg font-bold text-xl shadow-lg
+                     transition-all font-pixel"
+          style={{ fontSize: '1rem' }}
+          whileHover={{ scale: 1.05 }}
+          whileTap={{ scale: 0.95 }}
+        >
+          START ADVENTURE →
+        </motion.button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col items-center justify-center gap-6 p-8">
-      {/* Alternating pixel art icon with glow effect */}
-      <motion.div
-        animate={{
-          scale: [1, 1.15, 1],
-          rotate: [0, 8, -8, 0]
-        }}
-        transition={{
-          duration: 2,
-          repeat: Infinity,
-          ease: "easeInOut"
-        }}
-        className="text-adventure-gold drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]"
-      >
-        <IconComponent className="w-16 h-16" />
-      </motion.div>
+      {/* Show game during loading if enabled */}
+      {showGame && !campaignReady ? (
+        <MemoryGame isActive={true} />
+      ) : (
+        <>
+          {/* Alternating pixel art icon with glow effect */}
+          <motion.div
+            animate={{
+              scale: [1, 1.15, 1],
+              rotate: [0, 8, -8, 0]
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+            className="text-adventure-gold drop-shadow-[0_0_15px_rgba(251,191,36,0.5)]"
+          >
+            <IconComponent className="w-16 h-16" />
+          </motion.div>
+        </>
+      )}
 
-      {/* Loading message with fade transition */}
-      <div className="flex flex-col items-center gap-2">
-        <motion.p
-          key={displayMessage}
-          initial={{ opacity: 0, y: 10 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
-          transition={{ duration: 0.3 }}
-          className="text-lg font-pixel text-adventure-gold text-center min-h-[2rem]"
-        >
+      {/* Progress indicator (smaller, bottom) - only show when not showing game */}
+      {!showGame && (
+        <>
+          {/* Loading message with fade transition */}
+          <div className="flex flex-col items-center gap-2">
+            <motion.p
+              key={displayMessage}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.3 }}
+              className="text-lg font-pixel text-adventure-gold text-center min-h-[2rem]"
+            >
+              {displayMessage}
+            </motion.p>
+
+            {/* Hint text below rotating messages */}
+            {hint && (
+              <p className="text-xs text-gray-500 font-sans text-center">
+                {hint}
+              </p>
+            )}
+          </div>
+
+          {/* Progress bar */}
+          <div className="w-full max-w-md h-3 bg-zinc-900 rounded-full overflow-hidden border-2 border-adventure-gold/30">
+            {progress !== undefined ? (
+              // Determinate progress
+              <motion.div
+                className="h-full bg-gradient-to-r from-adventure-gold via-yellow-400 to-adventure-gold transition-all duration-300"
+                style={{ width: `${progress}%` }}
+                initial={{ width: 0 }}
+                animate={{ width: `${progress}%` }}
+              />
+            ) : (
+              // Indeterminate progress
+              <motion.div
+                className="h-full bg-gradient-to-r from-transparent via-adventure-gold to-transparent"
+                animate={{
+                  x: ['-100%', '200%']
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  ease: "easeInOut"
+                }}
+                style={{ width: '50%' }}
+              />
+            )}
+          </div>
+
+          {/* Progress text (priority) or Sub message */}
+          {progressText ? (
+            <p className="text-sm text-adventure-emerald font-sans text-center font-semibold">
+              {progressText}
+            </p>
+          ) : subMessage ? (
+            <p className="text-sm text-gray-500 font-sans text-center">
+              {subMessage}
+            </p>
+          ) : null}
+
+          {/* Pixel dots animation */}
+          <div className="flex gap-2">
+            {[0, 1, 2].map((i) => (
+              <motion.div
+                key={i}
+                className="w-2 h-2 bg-adventure-emerald rounded-sm"
+                animate={{
+                  opacity: [0.3, 1, 0.3],
+                  scale: [0.8, 1.2, 0.8]
+                }}
+                transition={{
+                  duration: 1.5,
+                  repeat: Infinity,
+                  delay: i * 0.2,
+                  ease: "easeInOut"
+                }}
+              />
+            ))}
+          </div>
+        </>
+      )}
+
+      {/* When showing game, show minimal status below */}
+      {showGame && (
+        <div className="text-sm text-gray-400 text-center">
+          <div className="animate-spin mb-2">⚙️</div>
           {displayMessage}
-        </motion.p>
-
-        {/* Hint text below rotating messages */}
-        {hint && (
-          <p className="text-xs text-gray-500 font-sans text-center">
-            {hint}
-          </p>
-        )}
-      </div>
-
-      {/* Progress bar */}
-      <div className="w-full max-w-md h-3 bg-zinc-900 rounded-full overflow-hidden border-2 border-adventure-gold/30">
-        {progress !== undefined ? (
-          // Determinate progress
-          <motion.div
-            className="h-full bg-gradient-to-r from-adventure-gold via-yellow-400 to-adventure-gold transition-all duration-300"
-            style={{ width: `${progress}%` }}
-            initial={{ width: 0 }}
-            animate={{ width: `${progress}%` }}
-          />
-        ) : (
-          // Indeterminate progress
-          <motion.div
-            className="h-full bg-gradient-to-r from-transparent via-adventure-gold to-transparent"
-            animate={{
-              x: ['-100%', '200%']
-            }}
-            transition={{
-              duration: 1.5,
-              repeat: Infinity,
-              ease: "easeInOut"
-            }}
-            style={{ width: '50%' }}
-          />
-        )}
-      </div>
-
-      {/* Progress text (priority) or Sub message */}
-      {progressText ? (
-        <p className="text-sm text-adventure-emerald font-sans text-center font-semibold">
-          {progressText}
-        </p>
-      ) : subMessage ? (
-        <p className="text-sm text-gray-500 font-sans text-center">
-          {subMessage}
-        </p>
-      ) : null}
-
-      {/* Pixel dots animation */}
-      <div className="flex gap-2">
-        {[0, 1, 2].map((i) => (
-          <motion.div
-            key={i}
-            className="w-2 h-2 bg-adventure-emerald rounded-sm"
-            animate={{
-              opacity: [0.3, 1, 0.3],
-              scale: [0.8, 1.2, 0.8]
-            }}
-            transition={{
-              duration: 1.5,
-              repeat: Infinity,
-              delay: i * 0.2,
-              ease: "easeInOut"
-            }}
-          />
-        ))}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

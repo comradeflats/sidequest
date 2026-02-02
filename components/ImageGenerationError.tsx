@@ -6,7 +6,7 @@ import { AlertCircle, RefreshCw, Image } from 'lucide-react';
 export interface ImageErrorDetails {
   questId: string;
   questTitle: string;
-  errorType: 'timeout' | 'quota' | 'unknown';
+  errorType: 'timeout' | 'quota' | 'overload' | 'unknown';
   retries: number;
 }
 
@@ -32,6 +32,8 @@ export default function ImageGenerationError({
         return 'Generation taking longer than expected';
       case 'quota':
         return 'API limit reached, try again later';
+      case 'overload':
+        return 'Service temporarily overloaded, will retry automatically';
       default:
         return "Couldn't generate image, please retry";
     }

@@ -148,6 +148,8 @@ export interface CampaignOptions {
   enableAudioQuests?: boolean;
   guaranteedMix?: boolean;        // Guarantee exactly 1 photo, 1 video, 1 audio quest
   onProgress?: (current: number, total: number) => void; // Progress callback for image generation
+  onImageStart?: (questId: string) => void;    // Callback when image generation starts
+  onImageComplete?: (questId: string) => void; // Callback when image generation completes
 }
 
 // Media types for verification

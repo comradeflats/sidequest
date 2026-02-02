@@ -65,12 +65,76 @@ export const getModel = (type: 'campaign' | 'verification' | 'image' | 'research
 // Track first image generation time for adaptive timeout
 let firstImageGenerationTime: number | null = null;
 
-export type ImageGenerationError = 'timeout' | 'quota' | 'unknown' | null;
+export type ImageGenerationError = 'timeout' | 'quota' | 'overload' | 'unknown' | null;
 
 export interface ImageGenerationResult {
   url: string | null;
   error: ImageGenerationError;
   duration?: number;
+}
+
+/**
+ * Timeout wrapper that properly cancels the promise race
+ * Ensures response is fully awaited before returning
+ */
+async function generateWithTimeout(
+  model: ReturnType<typeof getModel>,
+  prompt: string,
+  timeout: number
+): Promise<string | null> {
+  let timeoutId: NodeJS.Timeout;
+
+  const timeoutPromise = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      reject(new Error('Image generation timeout'));
+    }, timeout);
+  });
+
+  try {
+    const result = await Promise.race([
+      model.generateContent(prompt),
+      timeoutPromise
+    ]);
+
+    clearTimeout(timeoutId!);
+
+    // Ensure response is ready before processing
+    const response = await result.response;
+
+    // Try multiple response formats
+    const imagePart = response.candidates?.[0]?.content?.parts?.[0];
+
+    // Format 1: inlineData (expected)
+    if (imagePart?.inlineData?.data) {
+      const mimeType = imagePart.inlineData.mimeType || 'image/png';
+      const base64Data = imagePart.inlineData.data;
+      return `data:${mimeType};base64,${base64Data}`;
+    }
+
+    // Format 2: fileData (possible alternative)
+    if (imagePart?.fileData?.fileUri) {
+      console.warn('Image returned as fileUri (not base64):', imagePart.fileData.fileUri);
+      return imagePart.fileData.fileUri;
+    }
+
+    // Format 3: Check text response for debugging
+    if (imagePart?.text) {
+      console.warn('Image generation returned text instead of image:', imagePart.text);
+    }
+
+    // Log the actual response structure for debugging
+    console.error('Unexpected image response structure:', JSON.stringify({
+      candidates: response.candidates?.length || 0,
+      parts: response.candidates?.[0]?.content?.parts?.length || 0,
+      partKeys: imagePart ? Object.keys(imagePart) : []
+    }, null, 2));
+
+    // Return null with explicit error
+    throw new Error('Image response missing expected data format');
+  } catch (error) {
+    clearTimeout(timeoutId!);
+    throw error;
+  }
 }
 
 export async function generateQuestImage(
@@ -94,7 +158,7 @@ export async function generateQuestImage(
     // If first image took 15-30s, keep 30s timeout (Pro model)
   }
 
-  // Try with retry logic
+  // Try with retry logic on all failures
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const model = getModel('image');
@@ -124,51 +188,39 @@ export async function generateQuestImage(
       // Track generation time for adaptive timeout
       const startTime = Date.now();
 
-      // Use Promise.race to enforce timeout
-      const result = await Promise.race([
-        model.generateContent(prompt),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout')), effectiveTimeout)
-        )
-      ]);
+      // Use proper timeout wrapper
+      const imageUrl = await generateWithTimeout(model, prompt, effectiveTimeout);
 
-      const response = await result.response;
-
-      // Extract image data from response
-      const imagePart = response.candidates?.[0]?.content?.parts?.[0];
-
-      if (imagePart?.inlineData) {
-        const mimeType = imagePart.inlineData.mimeType || 'image/png';
-        const base64Data = imagePart.inlineData.data;
-
+      if (imageUrl) {
         // Track first successful generation time for adaptive timeout
         if (firstImageGenerationTime === null && adaptiveTimeout) {
           firstImageGenerationTime = Date.now() - startTime;
         }
-
-        return `data:${mimeType};base64,${base64Data}`;
+        return imageUrl;
       }
 
-      return null;
+      // Null result - retry
+      lastError = new Error('Image generation returned null');
+
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown error');
-
       console.log(`Image generation attempt ${attempt + 1}/${retries + 1} failed:`, lastError.message);
+    }
 
-      // If it's not a timeout or this is the last attempt, give up
-      if (!lastError.message.includes('Timeout') || attempt === retries) {
-        break;
-      }
+    // Retry on any error with adaptive backoff
+    if (attempt < retries) {
+      // Check if error is 503 overload - use longer backoff
+      const isOverload = lastError?.message.includes('503') || lastError?.message.includes('overloaded');
+      const baseWaitTime = isOverload ? 5000 : 2000; // 5s for overload, 2s for other errors
+      const waitTime = baseWaitTime * (attempt + 1);
 
-      // Wait before retry (exponential backoff: 2s, 4s, 6s)
-      const waitTime = 2000 * (attempt + 1);
-      console.log(`Retrying in ${waitTime/1000}s...`);
+      console.log(`Retrying image generation in ${waitTime/1000}s...${isOverload ? ' (service overloaded)' : ''}`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
   }
 
-  // All attempts failed - return null for backward compatibility
-  // Error type is tracked in lastError for future enhancement
+  // All attempts failed
+  console.error(`Image generation failed after ${retries + 1} attempts:`, lastError?.message);
   return null;
 }
 
@@ -199,7 +251,7 @@ export async function generateQuestImageWithDetails(
 
   const overallStartTime = Date.now();
 
-  // Try with retry logic
+  // Try with retry logic on all failures
   for (let attempt = 0; attempt <= retries; attempt++) {
     try {
       const model = getModel('image');
@@ -227,44 +279,37 @@ export async function generateQuestImageWithDetails(
 
       const startTime = Date.now();
 
-      const result = await Promise.race([
-        model.generateContent(prompt),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('Timeout')), effectiveTimeout)
-        )
-      ]);
+      // Use proper timeout wrapper
+      const imageUrl = await generateWithTimeout(model, prompt, effectiveTimeout);
 
-      const response = await result.response;
-      const imagePart = response.candidates?.[0]?.content?.parts?.[0];
-
-      if (imagePart?.inlineData) {
-        const mimeType = imagePart.inlineData.mimeType || 'image/png';
-        const base64Data = imagePart.inlineData.data;
-
+      if (imageUrl) {
         if (firstImageGenerationTime === null && adaptiveTimeout) {
           firstImageGenerationTime = Date.now() - startTime;
         }
 
         return {
-          url: `data:${mimeType};base64,${base64Data}`,
+          url: imageUrl,
           error: null,
           duration: Date.now() - overallStartTime
         };
       }
 
-      return { url: null, error: 'unknown' };
+      // Null result - retry
+      lastError = new Error('Image generation returned null');
+
     } catch (error) {
       lastError = error instanceof Error ? error : new Error('Unknown error');
-
       console.log(`Image generation attempt ${attempt + 1}/${retries + 1} failed:`, lastError.message);
+    }
 
-      if (!lastError.message.includes('Timeout') || attempt === retries) {
-        break;
-      }
+    // Retry on any error with adaptive backoff
+    if (attempt < retries) {
+      // Check if error is 503 overload - use longer backoff
+      const isOverload = lastError?.message.includes('503') || lastError?.message.includes('overloaded');
+      const baseWaitTime = isOverload ? 5000 : 2000; // 5s for overload, 2s for other errors
+      const waitTime = baseWaitTime * (attempt + 1);
 
-      // Wait before retry (exponential backoff: 2s, 4s, 6s)
-      const waitTime = 2000 * (attempt + 1);
-      console.log(`Retrying in ${waitTime/1000}s...`);
+      console.log(`Retrying in ${waitTime/1000}s...${isOverload ? ' (service overloaded)' : ''}`);
       await new Promise(resolve => setTimeout(resolve, waitTime));
     }
   }
@@ -272,9 +317,12 @@ export async function generateQuestImageWithDetails(
   // Determine error type from lastError
   let errorType: ImageGenerationError = 'unknown';
   if (lastError) {
-    if (lastError.message.includes('Timeout')) {
+    const msg = lastError.message.toLowerCase();
+    if (msg.includes('timeout')) {
       errorType = 'timeout';
-    } else if (lastError.message.includes('quota') || lastError.message.includes('limit')) {
+    } else if (msg.includes('503') || msg.includes('overload')) {
+      errorType = 'overload';
+    } else if (msg.includes('quota') || msg.includes('limit') || msg.includes('429')) {
       errorType = 'quota';
     }
   }
