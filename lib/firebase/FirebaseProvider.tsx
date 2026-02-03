@@ -16,18 +16,3 @@ export function FirebaseProvider({ children }: { children: ReactNode }) {
   return <>{children}</>;
 }
 
-/**
- * Hook for Firebase context - returns empty/default values
- * Kept for backwards compatibility with components that may still import it
- */
-export const useFirebase = () => ({
-  user: null,
-  loading: false,
-  isAuthenticated: false,
-  displayName: null,
-  storageMode: 'local' as const,
-  syncStatus: 'offline' as const,
-  needsProfileSetup: false,
-  updateUserDisplayName: async () => {},
-  completeProfileSetup: () => {},
-});
