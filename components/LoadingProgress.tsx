@@ -249,7 +249,7 @@ export default function LoadingProgress({
           {/* Progress text (priority) or Sub message */}
           {showGame ? (
             <p className="text-xs text-gray-500 text-center font-sans">
-              Estimated wait time is roughly one minute or less (varies by connection)
+              Campaign generation takes roughly one minute or less (varies by connection). You'll be notified if the generation fails.  
             </p>
           ) : progressText ? (
             <p className="text-sm text-adventure-emerald font-sans text-center font-semibold">
