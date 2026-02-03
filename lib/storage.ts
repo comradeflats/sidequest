@@ -17,6 +17,16 @@ const USER_PROFILE_KEY = 'user_profile';
 const MAX_HISTORY_SIZE = 10;
 const MAX_VISITED_PLACES = 500;
 
+// Visited place configuration for tiered penalty system
+export const VISITED_PLACE_CONFIG = {
+  HARD_EXCLUSION_DAYS: 7,
+  HARD_EXCLUSION_CAMPAIGNS: 3,
+  MEDIUM_PENALTY_DAYS: 30,
+  LIGHT_PENALTY_DAYS: 90,
+  MIN_UNVISITED_RATIO: 0.5,
+  MAX_CAMPAIGN_HISTORY: 10
+} as const;
+
 // Streak tracking data
 export interface StreakData {
   lastPlayDate: string; // YYYY-MM-DD format
@@ -492,23 +502,36 @@ export async function addVisitedPlace(place: {
 }): Promise<void> {
   try {
     const current = getVisitedPlaces();
-
-    // Check if place already exists (update timestamp if so)
     const existingIndex = current.findIndex(p => p.placeId === place.placeId);
-
-    const newPlace: VisitedPlace = {
-      ...place,
-      visitedAt: new Date()
-    };
 
     let updatedPlaces: VisitedPlace[];
 
     if (existingIndex >= 0) {
-      // Move to end (most recent) and update timestamp
+      // Update existing place with enhanced tracking
+      const existing = current[existingIndex];
+      const updatedPlace: VisitedPlace = {
+        ...existing,
+        visitedAt: new Date(),
+        lastCampaignDate: new Date(),
+        visitCount: existing.visitCount + 1,
+        campaignHistory: [
+          ...existing.campaignHistory.slice(-VISITED_PLACE_CONFIG.MAX_CAMPAIGN_HISTORY + 1),
+          place.campaignId
+        ]
+      };
+
+      // Move to end (most recent)
       current.splice(existingIndex, 1);
-      updatedPlaces = [...current, newPlace];
+      updatedPlaces = [...current, updatedPlace];
     } else {
-      // Add new place
+      // Add new place with enhanced tracking
+      const newPlace: VisitedPlace = {
+        ...place,
+        visitedAt: new Date(),
+        visitCount: 1,
+        lastCampaignDate: new Date(),
+        campaignHistory: [place.campaignId]
+      };
       updatedPlaces = [...current, newPlace];
     }
 
@@ -535,6 +558,61 @@ export function clearVisitedPlaces(): void {
     localStorage.removeItem(VISITED_PLACES_KEY);
   } catch {
     // Failed to clear visited places
+  }
+}
+
+/**
+ * Migrate existing visited places to new schema with campaign tracking
+ * This is a one-time operation that runs on app init
+ */
+export async function migrateVisitedPlacesV2(): Promise<void> {
+  try {
+    const existing = getVisitedPlaces();
+    if (existing.length === 0) return;
+
+    // Check if already migrated
+    const firstPlace = existing[0] as any;
+    if ('visitCount' in firstPlace && 'campaignHistory' in firstPlace) {
+      return; // Already migrated
+    }
+
+    // Group by placeId to consolidate duplicates
+    const consolidated = new Map<string, VisitedPlace>();
+
+    for (const place of existing) {
+      const existingPlace = consolidated.get(place.placeId);
+
+      if (existingPlace) {
+        // Merge duplicate entries
+        existingPlace.visitCount++;
+        if (!existingPlace.campaignHistory.includes(place.campaignId)) {
+          existingPlace.campaignHistory.push(place.campaignId);
+        }
+        if (place.visitedAt > existingPlace.visitedAt) {
+          existingPlace.visitedAt = place.visitedAt;
+          existingPlace.lastCampaignDate = place.visitedAt;
+        }
+      } else {
+        // Add new entry with enhanced fields
+        consolidated.set(place.placeId, {
+          ...place,
+          visitCount: 1,
+          lastCampaignDate: place.visitedAt,
+          campaignHistory: [place.campaignId]
+        });
+      }
+    }
+
+    // Save migrated data
+    const visitedData: VisitedPlacesData = {
+      places: Array.from(consolidated.values()),
+      lastUpdated: new Date()
+    };
+    localStorage.setItem(VISITED_PLACES_KEY, JSON.stringify(visitedData));
+
+    console.log(`[Migration] Enhanced ${consolidated.size} visited places`);
+  } catch (error) {
+    console.error('[Migration] Failed to migrate visited places:', error);
   }
 }
 

@@ -1,6 +1,6 @@
-import { Coordinates, PlaceData, DistanceRange, DISTANCE_RANGES } from '@/types';
+import { Coordinates, PlaceData, DistanceRange, DISTANCE_RANGES, VisitedPlace } from '@/types';
 import { costEstimator } from './cost-estimator';
-import { getVisitedPlaceIds } from './storage';
+import { getVisitedPlaceIds, getVisitedPlaces, VISITED_PLACE_CONFIG } from './storage';
 
 // Google Places API response types
 interface GooglePlace {
@@ -95,13 +95,17 @@ export async function findNearbyPlaces(
  * Select diverse, well-spaced quest locations from available places
  * All places must be within maxDistance radius from startCoordinates
  * @param visitedPlaceIds - Optional set of place IDs to deprioritize (0.5x score penalty)
+ * @param visitedPlacesData - Optional full visited places data for tiered penalties
+ * @param currentCampaignId - Optional current campaign ID for tracking
  */
 export function selectQuestPlaces(
   places: PlaceData[],
   count: number,
   distanceRange: DistanceRange,
   startCoordinates: Coordinates,
-  visitedPlaceIds?: Set<string>
+  visitedPlaceIds?: Set<string>,
+  visitedPlacesData?: VisitedPlace[],
+  currentCampaignId?: string
 ): PlaceData[] {
   if (places.length === 0) {
     return [];
@@ -138,6 +142,49 @@ export function selectQuestPlaces(
 
   if (placesWithinRadius.length <= count) {
     return placesWithinRadius;
+  }
+
+  // Helper function to calculate tiered penalty based on recency
+  const getPenaltyMultiplier = (placeId: string): number => {
+    if (!visitedPlacesData) {
+      // Fallback to simple penalty if no enhanced data available
+      return visitedPlaceIds?.has(placeId) ? 0.5 : 1.0;
+    }
+
+    const visitedPlace = visitedPlacesData.find(v => v.placeId === placeId);
+    if (!visitedPlace) return 1.0;
+
+    const now = new Date();
+    const daysSinceVisit = (now.getTime() - visitedPlace.visitedAt.getTime()) / (1000 * 60 * 60 * 24);
+    const recentCampaigns = visitedPlace.campaignHistory.slice(-VISITED_PLACE_CONFIG.HARD_EXCLUSION_CAMPAIGNS);
+
+    // Hard exclusion (0x penalty)
+    if (daysSinceVisit < VISITED_PLACE_CONFIG.HARD_EXCLUSION_DAYS ||
+        recentCampaigns.length >= VISITED_PLACE_CONFIG.HARD_EXCLUSION_CAMPAIGNS) {
+      return 0;
+    }
+    // Heavy penalty (0.2x score)
+    if (daysSinceVisit < VISITED_PLACE_CONFIG.MEDIUM_PENALTY_DAYS) {
+      return 0.2;
+    }
+    // Medium penalty (0.5x score)
+    if (daysSinceVisit < VISITED_PLACE_CONFIG.LIGHT_PENALTY_DAYS) {
+      return 0.5;
+    }
+    // Light penalty (0.7x score)
+    return 0.7;
+  };
+
+  // Check if we have enough unvisited places
+  const unvisitedCount = placesWithinRadius.filter(p => {
+    const penalty = getPenaltyMultiplier(p.placeId);
+    return penalty === 1.0;
+  }).length;
+  const unvisitedRatio = unvisitedCount / Math.max(placesWithinRadius.length, 1);
+
+  // Return empty array to trigger fallback in getQuestLocations
+  if (unvisitedRatio < VISITED_PLACE_CONFIG.MIN_UNVISITED_RATIO) {
+    return [];
   }
 
   // Helper function to check if place types are diverse
@@ -195,8 +242,8 @@ export function selectQuestPlaces(
       // Bonus for type diversity
       const diversityBonus = isDifferentType(place, selected) ? 0.3 : 0;
 
-      // Penalty for previously visited places (soft exclusion - 0.5x score)
-      const visitedPenalty = visitedPlaceIds?.has(place.placeId) ? 0.5 : 1.0;
+      // Tiered penalty for previously visited places (ranges from 0x to 1.0x based on recency)
+      const visitedPenalty = getPenaltyMultiplier(place.placeId);
 
       // Combined score: prioritize spacing but consider radius, diversity, and visited status
       const totalScore = ((spacingScore * 0.6) + (radiusScore * 0.1) + diversityBonus) * visitedPenalty;
@@ -268,15 +315,69 @@ export async function getQuestLocations(
   distanceRange: DistanceRange,
   count: number
 ): Promise<Array<PlaceData | Coordinates>> {
-  // Get visited place IDs for exclusion/deprioritization
+  // Get visited place IDs and full data for tiered exclusion
   const visitedPlaceIds = getVisitedPlaceIds();
+  const visitedPlacesData = getVisitedPlaces();
 
   try {
     // Try to get real places from Places API with variety mode
-    const places = await findNearbyPlaces(center, distanceRange, true);
+    let places = await findNearbyPlaces(center, distanceRange, true);
 
     if (places && places.length >= count) {
-      const selected = selectQuestPlaces(places, count, distanceRange, center, visitedPlaceIds);
+      let selected = selectQuestPlaces(
+        places,
+        count,
+        distanceRange,
+        center,
+        visitedPlaceIds,
+        visitedPlacesData
+      );
+
+      // Fallback 1: Expand radius if insufficient places
+      if (selected.length === 0 && distanceRange !== 'far') {
+        console.warn('[Quest Generation] Insufficient unvisited places, expanding radius');
+
+        const expandedRange = distanceRange === 'local' ? 'nearby' : 'far';
+        places = await findNearbyPlaces(center, expandedRange, true);
+        selected = selectQuestPlaces(
+          places,
+          count,
+          expandedRange,
+          center,
+          visitedPlaceIds,
+          visitedPlacesData
+        );
+
+        if (selected.length >= count) {
+          (selected as any).__radiusExpanded = true;
+          (selected as any).__expandedRange = expandedRange;
+        }
+      }
+
+      // Fallback 2: Relax time window if still insufficient
+      if (selected.length === 0) {
+        console.warn('[Quest Generation] Relaxing exclusion window to 2 days');
+
+        const relaxedData = visitedPlacesData.filter(v => {
+          const daysSince = (Date.now() - v.visitedAt.getTime()) / (1000 * 60 * 60 * 24);
+          return daysSince >= 2;
+        });
+
+        selected = selectQuestPlaces(
+          places,
+          count,
+          distanceRange,
+          center,
+          visitedPlaceIds,
+          relaxedData
+        );
+
+        if (selected.length >= count) {
+          (selected as any).__timeWindowRelaxed = true;
+        }
+      }
+
+      // Return selected if we have enough
       if (selected.length >= count) {
         return selected;
       }
@@ -285,6 +386,7 @@ export async function getQuestLocations(
     // Places API failed, using fallback
   }
 
-  // Fallback to random coordinates
+  // Fallback 3: Random coordinates (existing fallback)
+  console.warn('[Quest Generation] Using random coordinates fallback');
   return generateRandomQuestPoints(center, count, distanceRange);
 }

@@ -35,6 +35,7 @@ import {
   addXP,
   addVisitedPlace,
   migrateVisitedPlacesFromHistory,
+  migrateVisitedPlacesV2,
   updateStreak
 } from '@/lib/storage';
 import { useSessionContext } from '@/hooks/useSessionContext';
@@ -226,6 +227,8 @@ export default function Home() {
     const initializeApp = async () => {
       // Migrate visited places from history (one-time operation)
       await migrateVisitedPlacesFromHistory();
+      // Enhance visited places with campaign tracking (one-time operation)
+      await migrateVisitedPlacesV2();
 
       // Check for existing campaign
       const activeCampaignId = await getCurrentCampaignId();
@@ -594,6 +597,22 @@ export default function Home() {
 
       // Pass LocationData directly instead of string to avoid redundant geocoding
       const newCampaign = await generateCampaign(geocodedLocation, type, distanceRange, campaignOptions);
+
+      // Check for radius expansion or time window relaxation
+      if ((newCampaign.quests as any).__radiusExpanded) {
+        const expandedRange = (newCampaign.quests as any).__expandedRange;
+        console.warn(`Quest radius expanded from ${distanceRange} to ${expandedRange} due to limited unvisited places`);
+
+        // TODO: Show user-friendly warning toast/banner
+        // "Note: Quest area expanded to find new locations you haven't visited"
+      }
+
+      if ((newCampaign.quests as any).__timeWindowRelaxed) {
+        console.warn('Exclusion window relaxed due to limited unvisited places');
+
+        // TODO: Show user-friendly warning
+        // "Note: Some locations may be familiar from recent quests"
+      }
 
       // Campaign ready! Store it and show button
       setPendingCampaign(newCampaign);

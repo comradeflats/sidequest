@@ -243,6 +243,10 @@ export interface VisitedPlace {
   visitedAt: Date;
   campaignId: string;
   coordinates: Coordinates;
+  // Enhanced tracking fields for better overlap prevention
+  visitCount: number;          // Track repeat visits
+  lastCampaignDate: Date;      // Most recent campaign using this place
+  campaignHistory: string[];   // Last N campaign IDs (max 10)
 }
 
 export interface VisitedPlacesData {
