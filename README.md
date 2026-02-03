@@ -200,7 +200,7 @@ sidequest/
 │   ├── layout.tsx            # Root layout with metadata
 │   └── globals.css           # Global styles + pixel art CSS
 ├── components/
-│   └── Scanner.tsx           # Camera interface for photo capture
+│   └── MediaScanner.tsx      # Multi-modal media capture (photo/video/audio)
 ├── lib/
 │   ├── gemini.ts             # Gemini 3 model configuration
 │   ├── game-logic.ts         # Campaign generation & verification
