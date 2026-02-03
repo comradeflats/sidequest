@@ -12,7 +12,7 @@ import { LocationData } from '@/types';
  * Pre-generates during geocoding for instant display
  *
  * @param locationData - Location data with city/country
- * @returns Array of 4 short trivia facts
+ * @returns Array of 5 short trivia facts
  */
 export async function generateLocationTrivia(
   locationData: LocationData
@@ -31,7 +31,7 @@ export async function generateLocationTrivia(
   const country = locationData.country || '';
   const location = country ? `${city}, ${country}` : city;
 
-  const prompt = `Generate 4 short, interesting trivia facts about ${location}.
+  const prompt = `Generate 5 short, interesting trivia facts about ${location}.
 
 Requirements:
 - Each fact: 1 sentence, max 12 words
@@ -55,7 +55,7 @@ Over 300 sunny days each year`;
       .map(f => f.trim())
       .filter(f => f.length > 0 && f.length < 150); // Filter valid facts
 
-    const triviaFacts = facts.slice(0, 4); // Return max 4 facts (faster generation)
+    const triviaFacts = facts.slice(0, 5); // Return max 5 facts (faster generation)
     console.log('[Trivia] Generated', triviaFacts.length, 'facts:', triviaFacts);
     return triviaFacts;
   } catch (error) {

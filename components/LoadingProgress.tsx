@@ -249,7 +249,7 @@ export default function LoadingProgress({
           {/* Progress text (priority) or Sub message */}
           {showGame ? (
             <p className="text-xs text-gray-500 text-center font-sans">
-              Estimated: ~50 seconds
+              Estimated wait time is 50 seconds or less
             </p>
           ) : progressText ? (
             <p className="text-sm text-adventure-emerald font-sans text-center font-semibold">
