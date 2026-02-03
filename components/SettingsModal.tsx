@@ -2,10 +2,12 @@
 
 import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Ruler, User, Settings, Star, Trophy, MapPin, Flame, Compass, Map, Mountain, Tent, Gem, Swords, Crown, Ship, Bird, LucideIcon } from 'lucide-react';
+import { X, Ruler, User, Settings, Star, Trophy, MapPin, Flame, Compass, Map, Mountain, Tent, Gem, Swords, Crown, Ship, Bird, LucideIcon, AlertTriangle, ChevronRight } from 'lucide-react';
 import { UnitSystem } from '@/lib/units';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { AVATAR_OPTIONS } from '@/lib/storage';
+import ConfirmDialog from './ConfirmDialog';
+import type { Campaign } from '@/types';
 
 // Map icon names to Lucide components
 const ICON_MAP: Record<string, LucideIcon> = {
@@ -28,6 +30,8 @@ interface SettingsModalProps {
   onClose: () => void;
   unitSystem: UnitSystem;
   onToggleUnit: () => void;
+  campaign: Campaign | null;
+  onQuitCampaign: () => void;
 }
 
 type TabType = 'profile' | 'settings';
@@ -37,10 +41,13 @@ export default function SettingsModal({
   onClose,
   unitSystem,
   onToggleUnit,
+  campaign,
+  onQuitCampaign,
 }: SettingsModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>('profile');
   const [editingUsername, setEditingUsername] = useState(false);
   const [usernameInput, setUsernameInput] = useState('');
+  const [showQuitConfirmation, setShowQuitConfirmation] = useState(false);
 
   const {
     profile,
@@ -284,10 +291,54 @@ export default function SettingsModal({
                       </span>
                     </button>
                   </div>
+
+                  {/* Quit Campaign Button - only show when campaign active */}
+                  {campaign && (
+                    <div className="pt-6 mt-6 border-t border-zinc-800">
+                      <button
+                        onClick={() => setShowQuitConfirmation(true)}
+                        className="w-full flex items-center justify-between p-4 rounded-lg border-2 border-red-500/30 hover:border-red-500 hover:bg-red-500/10 transition-colors group"
+                      >
+                        <div className="flex items-center gap-3">
+                          <AlertTriangle className="w-5 h-5 text-red-400" />
+                          <div className="text-left">
+                            <p className="text-sm font-medium text-red-400">Quit Campaign</p>
+                            <p className="text-xs text-gray-500">
+                              End current adventure (progress and XP will be lost)
+                            </p>
+                          </div>
+                        </div>
+                        <ChevronRight className="w-4 h-4 text-gray-600 group-hover:text-red-400 transition-colors" />
+                      </button>
+                    </div>
+                  )}
                 </>
               )}
             </div>
           </motion.div>
+
+          {/* Quit Confirmation Dialog */}
+          <ConfirmDialog
+            isOpen={showQuitConfirmation}
+            onConfirm={() => {
+              setShowQuitConfirmation(false);
+              onClose(); // Close settings modal
+              onQuitCampaign(); // Trigger quit
+            }}
+            onCancel={() => setShowQuitConfirmation(false)}
+            title="QUIT CAMPAIGN?"
+            message="Your progress on this adventure will be lost. Any XP earned during this campaign will also be lost."
+            confirmText="QUIT CAMPAIGN"
+            cancelText="CANCEL"
+            isDestructive={true}
+            additionalInfo={
+              campaign && (
+                <div className="mt-2 text-sm text-gray-500">
+                  Current progress: Quest {campaign.currentQuestIndex + 1} of {campaign.quests.length}
+                </div>
+              )
+            }
+          />
         </>
       )}
     </AnimatePresence>

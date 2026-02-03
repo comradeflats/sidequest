@@ -24,6 +24,7 @@ interface CollapsibleToolbarProps {
   onOpenQuestBook: () => void;
   unitSystem: UnitSystem;
   onToggleUnit: () => void;
+  onQuitCampaign: () => void;
   contextTokenCount?: number;
   questHistoryCount?: number;
   contextTokenBreakdown?: TokenBreakdown;
@@ -35,6 +36,7 @@ export default function CollapsibleToolbar({
   onOpenQuestBook,
   unitSystem,
   onToggleUnit,
+  onQuitCampaign,
   contextTokenCount = 0,
   questHistoryCount = 0,
   contextTokenBreakdown,
@@ -200,6 +202,8 @@ export default function CollapsibleToolbar({
         onClose={() => setShowSettings(false)}
         unitSystem={unitSystem}
         onToggleUnit={onToggleUnit}
+        campaign={campaign}
+        onQuitCampaign={onQuitCampaign}
       />
     </div>
   );

@@ -36,11 +36,14 @@ import {
   addVisitedPlace,
   migrateVisitedPlacesFromHistory,
   migrateVisitedPlacesV2,
-  updateStreak
+  updateStreak,
+  setPlayerXP,
+  getPlayerProgress
 } from '@/lib/storage';
 import { useSessionContext } from '@/hooks/useSessionContext';
 import { useUnitPreference } from '@/hooks/useUnitPreference';
 import { formatDistance } from '@/lib/units';
+import { deleteImagesForCampaign, deleteMediaForCampaign, isIndexedDBAvailable } from '@/lib/indexeddb-storage';
 
 export default function Home() {
   const [location, setLocation] = useState('');
@@ -96,6 +99,7 @@ export default function Home() {
 
   // XP State
   const [xpGain, setXpGain] = useState<{ amount: number; timestamp: number } | null>(null);
+  const [campaignStartXP, setCampaignStartXP] = useState<number>(0);
 
   // Location Info Modal State
   const [showLocationInfo, setShowLocationInfo] = useState(false);
@@ -438,6 +442,10 @@ export default function Home() {
       resetWithStats(stored.journeyStats);
     }
 
+    // Track XP at campaign resume for potential rollback on quit
+    const currentProgress = getPlayerProgress();
+    setCampaignStartXP(currentProgress.totalXP);
+
     setSavedCampaignId(null);
   };
 
@@ -566,6 +574,10 @@ export default function Home() {
     setImageProgress(null);
     setImageGenErrors([]);
     setQuestImagesLoading(new Set());
+
+    // Track XP at campaign start for potential rollback on quit
+    const currentProgress = getPlayerProgress();
+    setCampaignStartXP(currentProgress.totalXP);
 
     setIsLoading(true);
     setCampaignReady(false);
@@ -930,6 +942,72 @@ export default function Home() {
     ) || null;
   };
 
+  // Handle Quit Campaign
+  const handleQuitCampaign = async () => {
+    if (!campaign) return;
+
+    const campaignId = campaign.id;
+
+    try {
+      // 1. Rollback XP to campaign start (user requirement: no XP for incomplete campaigns)
+      await setPlayerXP(campaignStartXP);
+
+      // 2. Clean up IndexedDB (images + media)
+      if (isIndexedDBAvailable()) {
+        await deleteImagesForCampaign(campaignId);
+        await deleteMediaForCampaign(campaignId);
+      }
+
+      // 3. Clear session context (AI memory)
+      resetSessionContext();
+
+      // 4. Clear localStorage entries
+      await clearCurrentCampaign();
+      localStorage.removeItem(`campaign_${campaignId}`);
+      localStorage.removeItem(`journey_${campaignId}`);
+
+      // 5. Reset all component state
+      setCampaign(null);
+      setCompletedQuests([]);
+      setResult(null);
+      setIsVerifying(false);
+      setIsScanning(false);
+      setPendingCampaign(null);
+      setCampaignReady(false);
+      setImageGenErrors([]);
+      setImageProgress(null);
+      setQuestImagesLoading(new Set());
+      setShowAppealDialog(false);
+      setLastCaptureData(null);
+      setShowJourneyMap(false);
+      setShowLocationInfo(false);
+      setLocationTrivia([]);
+      setLocation('');
+      setDistanceRange(null);
+      setGeocodedLocation(null);
+      setCampaignStartXP(0);
+
+      // 6. Scroll to top (return to setup screen)
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+
+      // 7. Track analytics
+      trackEvent({
+        name: 'campaign_abandoned',
+        params: {
+          campaign_id: campaignId,
+          quests_completed: completedQuests.length,
+          total_quests: campaign.quests.length
+        }
+      });
+    } catch (error) {
+      console.error('Failed to quit campaign:', error);
+      // Still reset UI state even if cleanup fails
+      setCampaign(null);
+      setCompletedQuests([]);
+      setCampaignStartXP(0);
+    }
+  };
+
   return (
     <main className="min-h-screen bg-black text-emerald-400 px-4 sm:px-6 py-6 overflow-x-hidden selection:bg-emerald-900 selection:text-emerald-100">
       {/* Unified Header Bar */}
@@ -941,6 +1019,7 @@ export default function Home() {
             onOpenQuestBook={() => setShowQuestBook(true)}
             unitSystem={unitSystem}
             onToggleUnit={toggleUnit}
+            onQuitCampaign={handleQuitCampaign}
             contextTokenCount={getContextTokenCount()}
             questHistoryCount={sessionContext?.questHistory.length || 0}
             contextTokenBreakdown={getTokenBreakdown()}

@@ -385,6 +385,29 @@ export async function addXP(amount: number): Promise<PlayerProgress> {
 }
 
 /**
+ * Set player XP to a specific value (for rollback on campaign quit)
+ */
+export async function setPlayerXP(targetXP: number): Promise<PlayerProgress> {
+  const current = getPlayerProgress();
+
+  // Calculate the difference
+  const xpDifference = current.totalXP - targetXP;
+  const questsDifference = Math.max(0, Math.floor(xpDifference / 100));
+
+  current.totalXP = Math.max(0, targetXP); // Don't go negative
+  current.questsCompleted = Math.max(0, current.questsCompleted - questsDifference);
+  current.level = calculateLevel(current.totalXP);
+
+  try {
+    localStorage.setItem(PLAYER_PROGRESS_KEY, JSON.stringify(current));
+  } catch {
+    // Failed to save player progress
+  }
+
+  return current;
+}
+
+/**
  * Get XP needed for next level
  */
 export function getXPForNextLevel(currentXP: number): { current: number; needed: number; progress: number } {
