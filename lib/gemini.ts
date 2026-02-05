@@ -36,9 +36,9 @@ export const getModel = (type: 'campaign' | 'verification' | 'image' | 'research
       config.generationConfig = { responseMimeType: "application/json" };
       break;
     case 'verification':
-      // GEMINI 3 SHOWCASE: Flash for fast multimodal understanding (photo/video/audio)
-      // Extended thinking through step-by-step prompts
-      modelName = "gemini-3-flash-preview";
+      // GEMINI 3 SHOWCASE: Pro for advanced multimodal reasoning (photo/video/audio)
+      // Superior reasoning capabilities for complex verification decisions
+      modelName = "gemini-3-pro-preview";
       config.generationConfig = {
         responseMimeType: "application/json"
       };

@@ -19,9 +19,9 @@ Built for solo travelers, urban explorers, and anyone who wants to discover thei
 
 ## Demo
 
-**Live Demo:** [Coming Soon]
+**Live Demo:** [sidequest-seven.vercel.app](https://sidequest-seven.vercel.app)
 
-**Demo Video:** [Link to 3-minute demonstration video]
+**Demo Video:** [Watch 3-minute demo on Vimeo](https://vimeo.com/1162065822)
 
 **Repository:** [github.com/comradeflats/sidequest](https://github.com/comradeflats/sidequest)
 
@@ -36,7 +36,7 @@ SideQuest showcases the **full multi-modal capabilities** of Google's Gemini 3 m
 | Model | Purpose | Implementation |
 |-------|---------|----------------|
 | **Gemini 3 Flash** | Quest Generation | Creates culturally-aware, location-specific challenges with narratives, objectives, and hidden verification criteria |
-| **Gemini 3 Flash (Multi-Modal)** | Media Verification | Analyzes **photos, videos, and audio recordings** against quest objectives with GPS context |
+| **Gemini 3 Pro** | Media Verification | Analyzes **photos, videos, and audio recordings** against quest objectives with advanced reasoning and GPS context |
 | **Gemini 3 Pro Image** | Image Synthesis | Generates 16-bit pixel art visualizations for each quest in SNES/Genesis aesthetic |
 
 ### Technical Implementation
@@ -49,7 +49,7 @@ SideQuest showcases the **full multi-modal capabilities** of Google's Gemini 3 m
 
 **Multi-Modal Quest Verification:**
 - Quests can require different media types: **photos, video recordings, or audio recordings**
-- Gemini 3 Flash analyzes all media types with its multi-modal capabilities:
+- Gemini 3 Pro analyzes all media types with its advanced multi-modal capabilities:
   - **Photo quests**: Capture images of landmarks, objects, or scenes
   - **Video quests**: Record 5-30 second clips demonstrating actions or environments
   - **Audio quests**: Record 10-60 seconds of ambient sounds, music, or spoken content
@@ -91,11 +91,10 @@ SideQuest showcases the **full multi-modal capabilities** of Google's Gemini 3 m
 - Smooth animations with Framer Motion
 - Monospace fonts and ALL_CAPS styling
 
-### Progressive Web App
-- Installable on mobile devices
-- Works offline with service worker support
-- Native-like experience on iOS and Android
+### Mobile Optimization
 - Battery-efficient GPS tracking (<10% per 30min)
+- Responsive design optimized for mobile devices
+- Touch-friendly interface for on-the-go gameplay
 
 ---
 
@@ -122,13 +121,118 @@ SideQuest showcases the **full multi-modal capabilities** of Google's Gemini 3 m
    - **Photo quests**: Snap pictures of landmarks, objects, or scenes
    - **Video quests**: Record short clips (5-30s) of actions or environments
    - **Audio quests**: Capture ambient sounds, music, or spoken content (10-60s)
-   - Gemini 3 Flash analyzes all media types with GPS context
+   - Gemini 3 Pro analyzes all media types with GPS context
    - Appeal with text explanation if verification fails
 
 5. **Complete & Progress**
    - Unlock new quests as you complete challenges
    - View journey map with walking directions at completion
    - Track total distance and time across your adventure
+
+---
+
+## Architecture
+
+### System Overview
+
+```mermaid
+graph TB
+    subgraph "User Input"
+        A[User enters location] --> B[Google Maps Geocoding API]
+        B --> C[LocationData + Coordinates]
+    end
+
+    subgraph "Campaign Generation"
+        C --> D[Gemini 3 Flash<br/>Quest Generation]
+        D --> E[Structured JSON<br/>2-5 Quests with metadata]
+        E --> F[Gemini 3 Pro Image<br/>Pixel Art Generation]
+        F --> G[Base64 Image Data<br/>16-bit aesthetic]
+    end
+
+    subgraph "Storage Layer"
+        G --> H[IndexedDB<br/>~50MB image cache]
+        H --> I[Campaign State<br/>localStorage]
+    end
+
+    subgraph "Quest Execution"
+        I --> J[User navigates to location]
+        J --> K[GPS Tracking<br/>Geolocation API]
+        K --> L[Capture Media<br/>Photo/Video/Audio]
+    end
+
+    subgraph "Verification Pipeline"
+        L --> M[Gemini 3 Pro<br/>Multi-Modal Analysis]
+        K --> M
+        M --> N{Verification Result}
+        N -->|Success| O[Quest Complete]
+        N -->|Failure| P[Appeal System]
+        P --> Q[Gemini 3 Pro<br/>Re-evaluation with context]
+        Q --> N
+    end
+
+    subgraph "Journey Completion"
+        O --> R[Journey Stats<br/>Distance, Duration, XP]
+        R --> S[Google Maps API<br/>Route visualization]
+        S --> T[Campaign Complete]
+    end
+
+    style D fill:#10b981
+    style F fill:#fbbf24
+    style M fill:#10b981
+    style Q fill:#10b981
+```
+
+### Data Flow
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Frontend
+    participant Google Maps
+    participant Gemini Flash
+    participant Gemini Pro
+    participant Gemini Pro Image
+    participant IndexedDB
+
+    User->>Frontend: Enter location
+    Frontend->>Google Maps: Geocode request
+    Google Maps-->>Frontend: Coordinates + LocationData
+
+    Frontend->>Gemini Flash: Generate campaign with context
+    Gemini Flash-->>Frontend: JSON (quests, narratives, criteria)
+
+    par Parallel Image Generation
+        Frontend->>Gemini Pro Image: Generate image 1
+        Frontend->>Gemini Pro Image: Generate image 2
+        Frontend->>Gemini Pro Image: Generate image N
+    end
+
+    Gemini Pro Image-->>Frontend: Base64 images
+    Frontend->>IndexedDB: Cache images
+
+    User->>Frontend: Navigate + capture media
+    Frontend->>Gemini Pro: Verify (media + GPS + criteria)
+    Gemini Pro-->>Frontend: Verification result
+
+    alt Verification fails
+        User->>Frontend: Submit appeal
+        Frontend->>Gemini Pro: Re-verify with context
+        Gemini Pro-->>Frontend: Updated result
+    end
+
+    Frontend->>Google Maps: Get route for completed journey
+    Google Maps-->>Frontend: Route data
+```
+
+### Gemini 3 Model Strategy
+
+| Model | Use Case | Rationale |
+|-------|----------|-----------|
+| **Gemini 3 Flash** | Quest generation (text → JSON) | Fast structured output for campaign creation |
+| **Gemini 3 Pro** | Multi-modal verification (photo/video/audio) | Superior reasoning for complex verification decisions |
+| **Gemini 3 Pro Image** | Pixel art generation | Only Gemini 3 image model available |
+
+**Key Optimization:** Each model is selected for its strengths—Flash for speed, Pro for reasoning quality, Pro Image for visual generation.
 
 ---
 
@@ -143,13 +247,13 @@ SideQuest showcases the **full multi-modal capabilities** of Google's Gemini 3 m
 
 ### AI & APIs
 - **@google/generative-ai 0.24.1** - Google Gemini SDK
-- **Gemini 3 Flash** - Text generation & multi-modal analysis (photo/video/audio)
+- **Gemini 3 Flash** - Quest generation (fast JSON structured output)
+- **Gemini 3 Pro** - Multi-modal verification (photo/video/audio analysis)
 - **Gemini 3 Pro Image** - Image generation
 
 ### Storage & Media
 - **IndexedDB** - Local image caching (~50MB)
 - **react-webcam 7.2.0** - Camera access
-- **next-pwa 5.6.0** - Progressive Web App support
 
 ---
 

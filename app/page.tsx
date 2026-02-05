@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef } from 'react';
+import dynamic from 'next/dynamic';
 import { motion, AnimatePresence } from 'framer-motion';
 import { MapPin, Compass, Zap, CheckCircle, XCircle, Camera, Video, Mic, Navigation, MessageSquare, ExternalLink, RefreshCw, Info } from 'lucide-react';
 import { generateCampaign, verifyMedia, verifyMediaWithAppeal } from '@/lib/game-logic';
@@ -23,7 +24,11 @@ import ThinkingPanel from '@/components/ThinkingPanel';
 import CollapsibleToolbar from '@/components/CollapsibleToolbar';
 import ImageGenerationError, { ImageErrorDetails } from '@/components/ImageGenerationError';
 import LocationInfoModal from '@/components/LocationInfoModal';
-import DebugPanel from '@/components/DebugPanel';
+
+const DebugPanel = dynamic(() => import('@/components/DebugPanel'), {
+  ssr: false,
+  loading: () => null
+});
 import {
   getCurrentCampaignId,
   loadCampaign,
@@ -42,7 +47,7 @@ import {
 } from '@/lib/storage';
 import { useSessionContext } from '@/hooks/useSessionContext';
 import { useUnitPreference } from '@/hooks/useUnitPreference';
-import { formatDistance } from '@/lib/units';
+import { formatDistance, calculateHaversineDistance } from '@/lib/units';
 import { deleteImagesForCampaign, deleteMediaForCampaign, isIndexedDBAvailable } from '@/lib/indexeddb-storage';
 
 export default function Home() {
@@ -106,6 +111,9 @@ export default function Home() {
 
   // Location Trivia State
   const [locationTrivia, setLocationTrivia] = useState<string[]>([]);
+
+  // Quest Warning State
+  const [questWarnings, setQuestWarnings] = useState<string[]>([]);
 
   // Ref for auto-scrolling to loading area on setup page
   const loadingRef = useRef<HTMLDivElement>(null);
@@ -611,19 +619,21 @@ export default function Home() {
       const newCampaign = await generateCampaign(geocodedLocation, type, distanceRange, campaignOptions);
 
       // Check for radius expansion or time window relaxation
+      const warnings: string[] = [];
+
       if ((newCampaign.quests as any).__radiusExpanded) {
         const expandedRange = (newCampaign.quests as any).__expandedRange;
         console.warn(`Quest radius expanded from ${distanceRange} to ${expandedRange} due to limited unvisited places`);
-
-        // TODO: Show user-friendly warning toast/banner
-        // "Note: Quest area expanded to find new locations you haven't visited"
+        warnings.push(`Quest area expanded to ${expandedRange} to find new locations you haven't visited`);
       }
 
       if ((newCampaign.quests as any).__timeWindowRelaxed) {
         console.warn('Exclusion window relaxed due to limited unvisited places');
+        warnings.push('Some locations may be familiar from recent quests due to limited options');
+      }
 
-        // TODO: Show user-friendly warning
-        // "Note: Some locations may be familiar from recent quests"
+      if (warnings.length > 0) {
+        setQuestWarnings(warnings);
       }
 
       // Campaign ready! Store it and show button
@@ -1229,6 +1239,25 @@ export default function Home() {
                 </div>
               </div>
 
+              {/* Quest Warnings */}
+              {questWarnings.length > 0 && (
+                <div className="space-y-2">
+                  {questWarnings.map((warning, i) => (
+                    <motion.div
+                      key={i}
+                      initial={{ opacity: 0, y: -10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="bg-yellow-900/20 border border-yellow-600/30 rounded p-3"
+                    >
+                      <div className="flex items-start gap-2">
+                        <Info className="w-4 h-4 text-yellow-500 flex-shrink-0 mt-0.5" />
+                        <span className="text-xs text-yellow-200/80 font-sans">{warning}</span>
+                      </div>
+                    </motion.div>
+                  ))}
+                </div>
+              )}
+
               {/* Loading State */}
               {isLoading && (
                 <div ref={loadingRef}>
@@ -1535,12 +1564,12 @@ export default function Home() {
                                   <Navigation className="w-4 h-4 text-adventure-sky" />
                                   <span>
                                     Distance: {(() => {
-                                      const R = 6371;
-                                      const dLat = ((currentQuest.coordinates.lat - userGps.lat) * Math.PI) / 180;
-                                      const dLng = ((currentQuest.coordinates.lng - userGps.lng) * Math.PI) / 180;
-                                      const a = Math.sin(dLat / 2) ** 2 + Math.cos((userGps.lat * Math.PI) / 180) * Math.cos((currentQuest.coordinates.lat * Math.PI) / 180) * Math.sin(dLng / 2) ** 2;
-                                      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                                      const distanceKm = R * c;
+                                      const distanceKm = calculateHaversineDistance(
+                                        userGps.lat,
+                                        userGps.lng,
+                                        currentQuest.coordinates.lat,
+                                        currentQuest.coordinates.lng
+                                      );
                                       return formatDistance(distanceKm, unitSystem);
                                     })()}
                                   </span>
